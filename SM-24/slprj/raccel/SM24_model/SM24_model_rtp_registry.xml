@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<MF0 version="1.1" packageUris="http://schema.mathworks.com/mf0/slsa_mm_rtp_registry/R2023a">
+  <slsa.mm.rtpregistry.ModelMetadata type="slsa.mm.rtpregistry.ModelMetadata" uuid="1ad9e256-fd70-4faa-944a-b1310ce8fe98">
+    <modelName>SM24_model</modelName>
+  </slsa.mm.rtpregistry.ModelMetadata>
+  <slsa.mm.rtpregistry.Parameter type="slsa.mm.rtpregistry.Parameter" uuid="e42ab096-cd92-47f8-acf2-f60cc8bc9f87">
+    <id type="slsa.mm.rtpregistry.BlockParameterId" uuid="2df30601-3f50-4dbe-b950-bb9702601031"/>
+    <rtpLocation type="slsa.mm.rtpregistry.RtpLocation" uuid="678ad373-3273-4d2e-b8eb-0bec28054b14"/>
+  </slsa.mm.rtpregistry.Parameter>
+  <slsa.mm.rtpregistry.BlockParameterId type="slsa.mm.rtpregistry.BlockParameterId" uuid="2df30601-3f50-4dbe-b950-bb9702601031">
+    <blockPath>SM24_model/Bode Plot/Trigger signal/Snapshot times</blockPath>
+    <name>Value</name>
+    <parameter type="slsa.mm.rtpregistry.Parameter" uuid="e42ab096-cd92-47f8-acf2-f60cc8bc9f87"/>
+  </slsa.mm.rtpregistry.BlockParameterId>
+  <slsa.mm.rtpregistry.RtpLocation type="slsa.mm.rtpregistry.RtpLocation" uuid="678ad373-3273-4d2e-b8eb-0bec28054b14">
+    <parameter type="slsa.mm.rtpregistry.Parameter" uuid="e42ab096-cd92-47f8-acf2-f60cc8bc9f87"/>
+    <valueIndices>8</valueIndices>
+    <valueIndices>8</valueIndices>
+  </slsa.mm.rtpregistry.RtpLocation>
+</MF0>
