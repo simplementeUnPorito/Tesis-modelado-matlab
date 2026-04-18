@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<MF0 version="1.1" packageUris="http://schema.mathworks.com/mf0/slsa_mm_rtp_registry/R2023a">
+  <slsa.mm.rtpregistry.ModelMetadata type="slsa.mm.rtpregistry.ModelMetadata" uuid="01a189ad-492c-4917-8ad1-6be39df7547e">
+    <modelName>FiltroDigital</modelName>
+  </slsa.mm.rtpregistry.ModelMetadata>
+  <slsa.mm.rtpregistry.SFunctionParameter type="slsa.mm.rtpregistry.SFunctionParameter" uuid="d56cc4f4-12e3-41e7-9383-377852626d34">
+    <isInlined>true</isInlined>
+    <id type="slsa.mm.rtpregistry.BlockParameterId" uuid="acf968fc-b9ea-4932-b35d-3d2558d2775e"/>
+    <rtpLocation type="slsa.mm.rtpregistry.RtpLocation" uuid="2ef18e0c-46e8-44ba-98ad-03ef93cf055a"/>
+  </slsa.mm.rtpregistry.SFunctionParameter>
+  <slsa.mm.rtpregistry.SFunctionParameter type="slsa.mm.rtpregistry.SFunctionParameter" uuid="1d207694-b8bd-4f6b-938b-9e746ca0b0b6">
+    <isInlined>true</isInlined>
+    <id type="slsa.mm.rtpregistry.BlockParameterId" uuid="9051bfcc-3692-4333-aff7-33352d488f5f"/>
+    <rtpLocation type="slsa.mm.rtpregistry.RtpLocation" uuid="e493ec5a-5fbc-4c7c-a01f-a9a7a2fdc13e"/>
+  </slsa.mm.rtpregistry.SFunctionParameter>
+  <slsa.mm.rtpregistry.BlockParameterId type="slsa.mm.rtpregistry.BlockParameterId" uuid="9051bfcc-3692-4333-aff7-33352d488f5f">
+    <blockPath>FiltroDigital/FIR x4(a) Decimation</blockPath>
+    <name>FILT</name>
+    <parameter type="slsa.mm.rtpregistry.SFunctionParameter" uuid="1d207694-b8bd-4f6b-938b-9e746ca0b0b6"/>
+  </slsa.mm.rtpregistry.BlockParameterId>
+  <slsa.mm.rtpregistry.BlockParameterId type="slsa.mm.rtpregistry.BlockParameterId" uuid="acf968fc-b9ea-4932-b35d-3d2558d2775e">
+    <blockPath>FiltroDigital/FIR x4(b) Decimation</blockPath>
+    <name>FILT</name>
+    <parameter type="slsa.mm.rtpregistry.SFunctionParameter" uuid="d56cc4f4-12e3-41e7-9383-377852626d34"/>
+  </slsa.mm.rtpregistry.BlockParameterId>
+  <slsa.mm.rtpregistry.RtpLocation type="slsa.mm.rtpregistry.RtpLocation" uuid="e493ec5a-5fbc-4c7c-a01f-a9a7a2fdc13e">
+    <parameter type="slsa.mm.rtpregistry.SFunctionParameter" uuid="1d207694-b8bd-4f6b-938b-9e746ca0b0b6"/>
+    <valueIndices>3</valueIndices>
+    <valueIndices>34</valueIndices>
+  </slsa.mm.rtpregistry.RtpLocation>
+  <slsa.mm.rtpregistry.RtpLocation type="slsa.mm.rtpregistry.RtpLocation" uuid="2ef18e0c-46e8-44ba-98ad-03ef93cf055a">
+    <parameter type="slsa.mm.rtpregistry.SFunctionParameter" uuid="d56cc4f4-12e3-41e7-9383-377852626d34"/>
+    <valueIndices>35</valueIndices>
+    <valueIndices>66</valueIndices>
+  </slsa.mm.rtpregistry.RtpLocation>
+  <slsa.mm.rtpregistry.SFunctionParameter type="slsa.mm.rtpregistry.SFunctionParameter" uuid="672f33b0-8541-4e82-ab9a-785fd2e86898">
+    <isInlined>true</isInlined>
+    <id type="slsa.mm.rtpregistry.BlockParameterId" uuid="5faaff3f-aac8-4eda-ad5f-b36e7a29e400"/>
+    <rtpLocation type="slsa.mm.rtpregistry.RtpLocation" uuid="7bb9443c-1175-4177-8cbd-4ac3b8d43e95"/>
+  </slsa.mm.rtpregistry.SFunctionParameter>
+  <slsa.mm.rtpregistry.BlockParameterId type="slsa.mm.rtpregistry.BlockParameterId" uuid="5faaff3f-aac8-4eda-ad5f-b36e7a29e400">
+    <blockPath>FiltroDigital/FIR x4(c) Decimation</blockPath>
+    <name>FILT</name>
+    <parameter type="slsa.mm.rtpregistry.SFunctionParameter" uuid="672f33b0-8541-4e82-ab9a-785fd2e86898"/>
+  </slsa.mm.rtpregistry.BlockParameterId>
+  <slsa.mm.rtpregistry.RtpLocation type="slsa.mm.rtpregistry.RtpLocation" uuid="7bb9443c-1175-4177-8cbd-4ac3b8d43e95">
+    <parameter type="slsa.mm.rtpregistry.SFunctionParameter" uuid="672f33b0-8541-4e82-ab9a-785fd2e86898"/>
+    <valueIndices>67</valueIndices>
+    <valueIndices>98</valueIndices>
+  </slsa.mm.rtpregistry.RtpLocation>
+</MF0>
