@@ -1,0 +1,15 @@
+=== geophone_scope log — 20-Apr-2026 07:04:37 ===
+[07:04:37.922] Conectado a COM7 @ 921600 baud
+[07:04:43.353] CMD_FREQ intento 1/5: 1.0 Hz  [BB 03 00 0A B2]
+[07:04:43.371] CMD_FREQ OK: 1.0 Hz confirmado.
+[07:04:46.684] CMD_FREQ intento 1/5: 10.0 Hz  [BB 03 00 64 DC]
+[07:04:46.698] CMD_FREQ OK: 10.0 Hz confirmado.
+[07:04:49.220] CMD_FREQ intento 1/5: 2.0 Hz  [BB 03 00 14 AC]
+[07:04:49.242] CMD_FREQ OK: 2.0 Hz confirmado.
+[07:04:52.231] CMD_FREQ intento 1/5: 1.0 Hz  [BB 03 00 0A B2]
+[07:04:52.259] CMD_FREQ OK: 1.0 Hz confirmado.
+[07:05:06.634] CMD_FREQ intento 1/5: 10.0 Hz  [BB 03 00 64 DC]
+[07:05:06.652] CMD_FREQ OK: 10.0 Hz confirmado.
+[07:05:10.199] --- Stream ON ---
+[07:05:14.528] Datos borrados.
+[07:05:16.796] --- Stream OFF ---

@@ -1,0 +1,334 @@
+=== geophone_scope log — 20-Apr-2026 07:21:33 ===
+[07:21:33.645] Conectado a COM7 @ 921600 baud
+[07:21:34.676] TICK #50  avail=0  totalBytes=0  streamON=0  parseState=0
+[07:21:35.052] CMD_FREQ intento 1/5: 1.0 Hz  [BB 03 00 0A B2]
+[07:21:35.358] CMD_FREQ intento 1: timeout sin respuesta.
+[07:21:35.463] CMD_FREQ intento 2/5: 1.0 Hz  [BB 03 00 0A B2]
+[07:21:35.768] CMD_FREQ intento 2: timeout sin respuesta.
+[07:21:35.871] CMD_FREQ intento 3/5: 1.0 Hz  [BB 03 00 0A B2]
+[07:21:36.175] CMD_FREQ intento 3: timeout sin respuesta.
+[07:21:36.277] CMD_FREQ intento 4/5: 1.0 Hz  [BB 03 00 0A B2]
+[07:21:36.580] CMD_FREQ intento 4: timeout sin respuesta.
+[07:21:36.683] CMD_FREQ intento 5/5: 1.0 Hz  [BB 03 00 0A B2]
+[07:21:36.987] CMD_FREQ intento 5: timeout sin respuesta.
+[07:21:37.089] CMD_FREQ FALLO tras 5 intentos.
+[07:21:37.785] TICK #100  avail=0  totalBytes=0  streamON=0  parseState=0
+[07:21:38.831] TICK #150  avail=0  totalBytes=0  streamON=0  parseState=0
+[07:21:39.883] TICK #200  avail=0  totalBytes=0  streamON=0  parseState=0
+[07:21:40.926] TICK #250  avail=0  totalBytes=0  streamON=0  parseState=0
+[07:21:41.903] CMD_FREQ intento 1/5: 10.0 Hz  [BB 03 00 64 DC]
+[07:21:42.206] CMD_FREQ intento 1: timeout sin respuesta.
+[07:21:42.309] CMD_FREQ intento 2/5: 10.0 Hz  [BB 03 00 64 DC]
+[07:21:42.617] CMD_FREQ intento 2: timeout sin respuesta.
+[07:21:42.719] CMD_FREQ intento 3/5: 10.0 Hz  [BB 03 00 64 DC]
+[07:21:43.021] CMD_FREQ intento 3: timeout sin respuesta.
+[07:21:43.123] CMD_FREQ intento 4/5: 10.0 Hz  [BB 03 00 64 DC]
+[07:21:43.428] CMD_FREQ intento 4: timeout sin respuesta.
+[07:21:43.530] CMD_FREQ intento 5/5: 10.0 Hz  [BB 03 00 64 DC]
+[07:21:43.835] CMD_FREQ intento 5: timeout sin respuesta.
+[07:21:43.937] CMD_FREQ FALLO tras 5 intentos.
+[07:21:44.025] TICK #300  avail=0  totalBytes=0  streamON=0  parseState=0
+[07:21:45.073] TICK #350  avail=0  totalBytes=0  streamON=0  parseState=0
+[07:21:46.268] TICK #400  avail=0  totalBytes=0  streamON=0  parseState=0
+[07:21:47.456] TICK #450  avail=0  totalBytes=0  streamON=0  parseState=0
+[07:21:48.514] TICK #500  avail=0  totalBytes=0  streamON=0  parseState=0
+[07:21:49.559] TICK #550  avail=0  totalBytes=0  streamON=0  parseState=0
+[07:21:50.669] TICK #600  avail=0  totalBytes=0  streamON=0  parseState=0
+[07:21:51.715] TICK #650  avail=0  totalBytes=0  streamON=0  parseState=0
+[07:21:52.755] TICK #700  avail=0  totalBytes=0  streamON=0  parseState=0
+[07:21:53.799] TICK #750  avail=0  totalBytes=0  streamON=0  parseState=0
+[07:21:54.842] TICK #800  avail=0  totalBytes=0  streamON=0  parseState=0
+[07:21:55.470] TICK #830  avail=10  totalBytes=0  streamON=0  parseState=0
+[07:21:55.473] RX tick=830  bytes=10  total=10  hex: AA 00 F8 00 FF F0 34 00 00 00
+[07:21:55.768] TICK #844  avail=10  totalBytes=10  streamON=0  parseState=0
+[07:21:55.769] RX tick=844  bytes=10  total=20  hex: AA 00 F8 00 FF DD 17 00 00 00
+[07:21:55.893] TICK #850  avail=0  totalBytes=20  streamON=0  parseState=0
+[07:21:55.978] TICK #854  avail=10  totalBytes=20  streamON=0  parseState=0
+[07:21:55.979] RX tick=854  bytes=10  total=30  hex: AA 00 F8 00 FF DE 03 00 00 00
+[07:21:56.146] TICK #862  avail=10  totalBytes=30  streamON=0  parseState=0
+[07:21:56.147] RX tick=862  bytes=10  total=40  hex: AA 00 F8 00 FF DE 8C 00 00 00
+[07:21:56.314] TICK #870  avail=10  totalBytes=40  streamON=0  parseState=0
+[07:21:56.315] RX tick=870  bytes=10  total=50  hex: AA 00 F8 00 FF DF 32 00 00 00
+[07:21:56.441] TICK #876  avail=10  totalBytes=50  streamON=0  parseState=0
+[07:21:56.441] RX tick=876  bytes=10  total=60  hex: AA 00 F8 00 FF DE DF 00 00 00
+[07:21:56.588] TICK #883  avail=10  totalBytes=60  streamON=0  parseState=0
+[07:21:56.589] RX tick=883  bytes=10  total=70  hex: AA 00 F8 00 FF DD 8B 00 00 00
+[07:21:56.941] TICK #900  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:21:57.989] TICK #950  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:21:59.035] TICK #1000  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:21:59.450] CMD_FREQ intento 1/5: 10.0 Hz  [BB 03 00 64 DC]
+[07:21:59.755] CMD_FREQ intento 1: timeout sin respuesta.
+[07:21:59.858] CMD_FREQ intento 2/5: 10.0 Hz  [BB 03 00 64 DC]
+[07:22:00.159] CMD_FREQ intento 2: timeout sin respuesta.
+[07:22:00.260] CMD_FREQ intento 3/5: 10.0 Hz  [BB 03 00 64 DC]
+[07:22:00.566] CMD_FREQ intento 3: timeout sin respuesta.
+[07:22:00.667] CMD_FREQ intento 4/5: 10.0 Hz  [BB 03 00 64 DC]
+[07:22:00.971] CMD_FREQ intento 4: timeout sin respuesta.
+[07:22:01.073] CMD_FREQ intento 5/5: 10.0 Hz  [BB 03 00 64 DC]
+[07:22:01.377] CMD_FREQ intento 5: timeout sin respuesta.
+[07:22:01.479] CMD_FREQ FALLO tras 5 intentos.
+[07:22:02.128] TICK #1050  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:22:03.169] TICK #1100  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:22:03.314] --- Stream ON ---
+[07:22:04.213] TICK #1150  avail=0  totalBytes=70  streamON=1  parseState=0
+[07:22:05.255] TICK #1200  avail=0  totalBytes=70  streamON=1  parseState=0
+[07:22:06.299] TICK #1250  avail=0  totalBytes=70  streamON=1  parseState=0
+[07:22:07.037] Datos borrados.
+[07:22:07.347] TICK #1300  avail=0  totalBytes=70  streamON=1  parseState=0
+[07:22:08.387] TICK #1350  avail=0  totalBytes=70  streamON=1  parseState=0
+[07:22:08.942] Datos borrados.
+[07:22:09.375] --- Stream OFF ---
+[07:22:09.431] TICK #1400  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:22:10.489] TICK #1450  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:22:11.535] TICK #1500  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:22:12.584] TICK #1550  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:22:13.631] TICK #1600  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:22:14.694] TICK #1650  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:22:15.762] TICK #1700  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:22:16.830] TICK #1750  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:22:18.389] TICK #1800  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:22:19.942] TICK #1850  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:22:21.503] TICK #1900  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:22:23.061] TICK #1950  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:22:24.624] TICK #2000  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:22:26.181] TICK #2050  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:22:27.738] TICK #2100  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:22:29.293] TICK #2150  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:22:30.851] TICK #2200  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:22:32.405] TICK #2250  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:22:33.964] TICK #2300  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:22:35.521] TICK #2350  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:22:37.076] TICK #2400  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:22:38.641] TICK #2450  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:22:40.204] TICK #2500  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:22:41.764] TICK #2550  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:22:43.324] TICK #2600  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:22:44.881] TICK #2650  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:22:46.433] TICK #2700  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:22:47.996] TICK #2750  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:22:49.555] TICK #2800  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:22:51.228] TICK #2850  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:22:52.775] TICK #2900  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:22:54.328] TICK #2950  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:22:55.886] TICK #3000  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:22:57.443] TICK #3050  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:22:59.001] TICK #3100  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:23:00.561] TICK #3150  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:23:02.115] TICK #3200  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:23:03.673] TICK #3250  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:23:05.228] TICK #3300  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:23:06.784] TICK #3350  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:23:08.344] TICK #3400  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:23:09.910] TICK #3450  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:23:11.467] TICK #3500  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:23:13.025] TICK #3550  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:23:14.581] TICK #3600  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:23:16.139] TICK #3650  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:23:17.697] TICK #3700  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:23:19.253] TICK #3750  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:23:20.810] TICK #3800  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:23:22.371] TICK #3850  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:23:23.926] TICK #3900  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:23:25.480] TICK #3950  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:23:27.043] TICK #4000  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:23:28.601] TICK #4050  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:23:30.158] TICK #4100  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:23:31.717] TICK #4150  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:23:33.275] TICK #4200  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:23:34.834] TICK #4250  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:23:36.387] TICK #4300  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:23:37.941] TICK #4350  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:23:39.500] TICK #4400  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:23:41.060] TICK #4450  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:23:42.618] TICK #4500  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:23:44.173] TICK #4550  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:23:45.730] TICK #4600  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:23:47.288] TICK #4650  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:23:48.847] TICK #4700  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:23:50.405] TICK #4750  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:23:51.960] TICK #4800  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:23:53.514] TICK #4850  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:23:55.074] TICK #4900  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:23:56.629] TICK #4950  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:23:58.186] TICK #5000  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:23:59.742] TICK #5050  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:24:01.299] TICK #5100  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:24:02.855] TICK #5150  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:24:04.410] TICK #5200  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:24:05.961] TICK #5250  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:24:07.518] TICK #5300  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:24:09.076] TICK #5350  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:24:10.634] TICK #5400  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:24:12.188] TICK #5450  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:24:13.746] TICK #5500  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:24:15.304] TICK #5550  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:24:16.858] TICK #5600  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:24:18.410] TICK #5650  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:24:19.970] TICK #5700  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:24:21.530] TICK #5750  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:24:23.077] TICK #5800  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:24:24.635] TICK #5850  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:24:26.191] TICK #5900  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:24:27.749] TICK #5950  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:24:29.306] TICK #6000  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:24:30.860] TICK #6050  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:24:32.419] TICK #6100  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:24:33.981] TICK #6150  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:24:35.543] TICK #6200  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:24:37.105] TICK #6250  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:24:38.664] TICK #6300  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:24:40.219] TICK #6350  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:24:41.776] TICK #6400  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:24:43.337] TICK #6450  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:24:44.890] TICK #6500  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:24:46.451] TICK #6550  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:24:48.006] TICK #6600  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:24:49.568] TICK #6650  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:24:51.124] TICK #6700  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:24:52.679] TICK #6750  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:24:54.233] TICK #6800  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:24:55.790] TICK #6850  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:24:57.344] TICK #6900  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:24:58.901] TICK #6950  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:25:00.460] TICK #7000  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:25:02.018] TICK #7050  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:25:03.571] TICK #7100  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:25:05.132] TICK #7150  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:25:06.685] TICK #7200  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:25:08.238] TICK #7250  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:25:09.796] TICK #7300  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:25:11.353] TICK #7350  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:25:12.904] TICK #7400  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:25:14.463] TICK #7450  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:25:16.021] TICK #7500  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:25:17.580] TICK #7550  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:25:19.135] TICK #7600  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:25:20.691] TICK #7650  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:25:22.245] TICK #7700  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:25:23.800] TICK #7750  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:25:25.356] TICK #7800  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:25:26.912] TICK #7850  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:25:28.471] TICK #7900  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:25:30.026] TICK #7950  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:25:31.582] TICK #8000  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:25:33.139] TICK #8050  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:25:34.693] TICK #8100  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:25:36.250] TICK #8150  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:25:37.809] TICK #8200  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:25:39.365] TICK #8250  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:25:40.922] TICK #8300  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:25:42.480] TICK #8350  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:25:44.038] TICK #8400  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:25:45.593] TICK #8450  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:25:47.153] TICK #8500  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:25:48.714] TICK #8550  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:25:50.271] TICK #8600  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:25:51.833] TICK #8650  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:25:53.389] TICK #8700  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:25:54.946] TICK #8750  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:25:56.504] TICK #8800  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:25:58.061] TICK #8850  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:25:59.620] TICK #8900  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:26:01.174] TICK #8950  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:26:02.736] TICK #9000  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:26:04.291] TICK #9050  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:26:05.850] TICK #9100  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:26:07.411] TICK #9150  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:26:08.971] TICK #9200  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:26:10.530] TICK #9250  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:26:12.090] TICK #9300  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:26:13.648] TICK #9350  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:26:15.205] TICK #9400  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:26:16.765] TICK #9450  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:26:18.329] TICK #9500  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:26:19.882] TICK #9550  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:26:21.440] TICK #9600  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:26:22.996] TICK #9650  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:26:24.555] TICK #9700  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:26:26.115] TICK #9750  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:26:27.668] TICK #9800  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:26:29.225] TICK #9850  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:26:30.784] TICK #9900  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:26:32.343] TICK #9950  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:26:33.899] TICK #10000  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:26:35.458] TICK #10050  avail=0  totalBytes=70  streamON=0  parseState=0
+[07:26:36.111] TICK #10071  avail=88  totalBytes=70  streamON=0  parseState=0
+[07:26:36.112] RX tick=10071  bytes=88  total=158  hex: FF FF FF FE FF FF FE E8 FE FF F1 FD FE FE FA F0 F1 FB FF F0 FC 7D F8 FC E0 F0 F7 78 E0 F8 FA E1 FC 3F FD 1E 7F A8 7A FC 40 A0 FA E1 92 E0 F8 D0 FF F8 07 BC C2 27 18 80 FE 3D E8 1A 5E E0 F9 E1 FC C0 5F D0 F2 F0 F0 F0 AE C1 DC F0 F6 FF FF F4 FF E2 F1 EE FD FF FF FF
+[07:26:36.142] TICK #10072  avail=315  totalBytes=158  streamON=0  parseState=0
+[07:26:36.144] RX tick=10072  bytes=315  total=473  hex: FF FF FF FF BE F9 FF FD FE FE AE E0 F8 FE C1 FD 7F 7F F0 FC F6 F8 FE FC F8 CA E0 7F A2 10 C1 FC 16 0A 01 FC E0 01 41 F3 C0 12 30 79 C0 08 54 FF 80 7C 00 7F 7B 40 F0 00 00 78 0A BC 02 F3 01 00 00 00 00 F0 80 00 01 82 5F 48 08 00 FC 10 00 0B 90 08 07 1E 42 80 00 07 00 00 00 00 00 00 80 00 00 18 00 01 00 00 02 02 00 01 41 00 00 00 60 00 02 1F 10 01 01 40 00 01 00 00 00 03 00 00 19 00 00 00 00 40 00 01 80 01 1F 00 0F 02 01 02 01 04 00 02 02 12 49 16 80 02 F1 02 3D F0 00 9A 00 1E 79 04 0A 80 04 9E 80 00 FD 45 36 FE FC 01 FF 1A 04 4F E3 E0 F0 D0 F5 FC FD D9 FF FF FF FF FF F5 FF F9 BF FD FC FA F8 FF DC FD F0 FA 7F F0 F0 F6 F2 81 E0 FB 80 F0 F4 E0 60 F0 E0 A2 EC C0 62 C0 E0 E0 C0 00 80 A2 80 C4 00 80 C2 00 00 00 00 11 04 41 03 07 00 0E 1F 00 06 07 00 00 00 00 00 03 0A 00 00 03 01 00 00 02 01 0E 01 00 01 02 00 01 00 00 00 00 00 00 00 00 00 02 45 00 01 0A 8B 34 00 02 7F 00 FC 80 00 02 AE FC 41 FF 80 82 04 D0 F0 06 C1 FA FD FF FD F6 FA FF FF
+[07:26:36.204] TICK #10074  avail=292  totalBytes=473  streamON=0  parseState=0
+[07:26:36.205] RX tick=10074  bytes=292  total=765  hex: FE FF FF FF FD F8 FE F1 F8 FE F5 F9 FE E0 F9 E0 F0 F4 F5 E5 E1 E5 FF A9 E4 F1 F2 80 5C FC C0 C0 70 F8 E0 80 F8 80 60 80 80 90 F0 00 C0 C0 80 83 01 E0 E6 00 40 02 00 7F 0A 16 00 80 00 01 00 80 88 00 00 01 00 00 02 00 0F 00 01 01 00 00 02 00 01 01 00 02 00 00 02 00 00 00 00 00 00 00 00 00 00 00 08 02 01 02 02 86 16 68 01 7C 20 05 FF 78 00 2F 00 80 00 7D 00 04 D0 F8 91 AA FF F2 FE FF FE FF FE FF F0 F4 F8 FD FF E2 F0 C1 E0 FD E0 C1 C0 C0 EE 80 1C 08 F4 04 00 02 00 00 78 02 0F 00 D0 1C 00 10 00 C0 00 00 C2 80 00 1D 00 08 80 00 01 AA 00 00 80 00 02 00 00 00 0A 00 00 02 00 00 00 00 00 02 00 00 00 00 00 00 01 00 00 00 00 00 00 00 01 01 00 00 7E 00 00 00 00 FD 5D 01 05 FE D1 0F 02 90 A2 FD FC DD FA E3 F7 FE FC FF E2 FD F0 FF FC FD D0 DB FC E0 F8 F0 E8 80 C0 41 41 80 C2 C0 80 C0 0F 40 E0 00 07 07 02 41 00 02 00 00 00 02 00 01 00 00 00 00 02 00 00 00 00 00 00 00 00 00 00 00
+[07:26:36.234] TICK #10075  avail=150  totalBytes=765  streamON=0  parseState=0
+[07:26:36.235] RX tick=10075  bytes=150  total=915  hex: 00 00 00 00 01 13 92 7A 4D 01 FF 00 4F F6 F4 00 FF 44 C1 EA D3 FA FF FB FF FF FF FE FF DD F8 7F FF FF FA 14 E0 7F FF 00 7F 3C 8A 07 D1 00 FC 00 01 E0 00 C0 00 08 00 00 07 28 00 00 00 03 00 00 00 00 00 00 00 00 01 00 05 0A F0 00 FF 00 50 10 7D 82 1A FE 81 80 00 F1 E9 FB DF FF FF FF FF FF FE FE FF E9 FE FC C0 68 1F 1F 0F E2 80 1E 8F 0E E0 80 6D 00 3E 80 28 00 06 E0 00 00 01 00 01 00 00 00 00 00 00 02 00 00 1D 40 13 AE E0 00 3F C0 01 D0 BE BA FF FF
+[07:26:36.296] TICK #10077  avail=97  totalBytes=915  streamON=0  parseState=0
+[07:26:36.298] RX tick=10077  bytes=97  total=1012  hex: FF F8 FA FE E1 FE E0 D0 F6 C1 80 1F 00 88 82 01 A1 C0 00 00 00 01 00 05 00 00 00 02 00 01 00 00 01 02 02 20 10 8A 00 00 C0 87 E1 D4 A1 FC 10 BD 1F EC 00 F0 81 0A 3E 00 00 00 02 00 C0 80 D3 E0 FE F8 F1 F9 FF F0 F1 11 41 47 80 00 13 01 0F 01 02 01 02 02 00 00 00 01 02 00 01 4F 11 17 E0 FA F0
+[07:26:36.329] TICK #10078  avail=76  totalBytes=1012  streamON=0  parseState=0
+[07:26:36.330] RX tick=10078  bytes=76  total=1088  hex: FD F0 80 F7 00 02 81 00 00 11 00 40 04 00 00 0E 01 02 01 00 00 00 38 01 00 18 E0 86 E1 FF FA 2F FF FF FF AA F0 82 C3 FE 00 00 00 02 02 00 00 00 00 00 00 00 0C A2 0A B8 80 3E F8 40 C1 F5 F9 FE FF F2 94 41 00 11 F9 00 3F 00 00 00
+[07:26:36.394] TICK #10080  avail=69  totalBytes=1088  streamON=0  parseState=0
+[07:26:36.395] RX tick=10080  bytes=69  total=1157  hex: 00 00 00 07 00 D0 01 00 E0 FF E9 FF F9 FF D1 10 7F 40 17 BA 00 10 00 02 02 00 02 00 02 00 00 00 00 F8 80 12 D2 7F F8 F8 FF FD F3 F0 80 07 04 1E 02 80 01 00 00 00 01 00 08 01 01 B8 1E 10 F2 C0 E0 F0 FC FE FF
+[07:26:36.424] TICK #10081  avail=67  totalBytes=1157  streamON=0  parseState=0
+[07:26:36.425] RX tick=10081  bytes=67  total=1224  hex: FD FE FF F1 12 D0 0D FE 00 00 00 0A 01 00 00 00 00 01 19 00 80 00 E0 F0 FF FE ED B8 C0 C0 01 08 00 02 00 00 00 00 00 01 11 0C 00 02 7E 7D 51 80 A0 FE E2 FF FF FF D4 10 5F FA 01 43 12 00 02 00 00 00 00
+[07:26:36.485] TICK #10083  avail=58  totalBytes=1224  streamON=0  parseState=0
+[07:26:36.486] RX tick=10083  bytes=58  total=1282  hex: 00 02 08 00 00 00 80 00 C0 9E FE E2 FF F2 FF FF F5 AA FE 01 7F 80 00 C0 00 01 13 11 00 00 00 00 00 01 00 40 48 02 7F A8 FA F0 FA FF FF F9 F0 F0 F0 02 10 5F 80 00 00 00 05 00
+[07:26:36.516] TICK #10084  avail=67  totalBytes=1282  streamON=0  parseState=0
+[07:26:36.517] RX tick=10084  bytes=67  total=1349  hex: 00 01 00 00 0D 3C 80 80 01 01 FF F8 F2 FF FD FF F1 C1 FC 00 7F 00 0A EA 00 54 01 05 00 00 00 00 01 00 51 01 40 FE C4 C1 FE FF FA D0 F8 00 82 00 34 1F F8 00 02 00 00 00 02 00 03 07 70 AC 12 FF F0 FF F4
+[07:26:36.584] TICK #10086  avail=79  totalBytes=1349  streamON=0  parseState=0
+[07:26:36.585] RX tick=10086  bytes=79  total=1428  hex: FF FA FA D0 80 E0 80 F0 80 01 01 15 20 08 00 00 00 00 07 00 C0 D0 FF 00 D0 7F FF E4 FE FD FF FB FF F9 F1 00 FF 03 08 7E 00 57 0F 8A 0E 00 01 00 26 10 00 41 D8 81 60 E3 C0 FF F0 FF FF FE FE FF E8 E8 00 FF 82 10 F9 00 00 00 06 17 2A 00 00
+[07:26:36.612] TICK #10087  avail=67  totalBytes=1428  streamON=0  parseState=0
+[07:26:36.612] RX tick=10087  bytes=67  total=1495  hex: 00 00 01 08 C0 00 00 00 80 F1 C3 C4 FF F0 F0 FF FA EF F5 FF FF F0 43 01 9E DF FE 00 16 1D 00 01 0A 00 00 00 00 00 05 08 00 03 80 7C 82 20 BF FE E0 BA 11 FF 28 00 75 11 3C 40 02 FD 00 00 00 00 10 00 00
+[07:26:36.673] TICK #10089  avail=75  totalBytes=1495  streamON=0  parseState=0
+[07:26:36.674] RX tick=10089  bytes=75  total=1570  hex: 00 05 80 00 04 00 00 E0 78 F7 ED FD FF FF FF FE 7A E0 04 DC 00 1E 40 00 58 02 02 00 00 02 08 0F 00 C1 01 C2 E0 C0 7A FE F4 7F FF FF FF FF F5 B7 D8 82 02 04 FF 41 8A 00 00 00 00 00 01 00 0A 10 00 00 F1 02 00 FF 44 B0 FF FF FE
+[07:26:36.704] TICK #10090  avail=89  totalBytes=1570  streamON=0  parseState=0
+[07:26:36.705] RX tick=10090  bytes=89  total=1659  hex: FF F4 FF 80 7F D0 07 FC 00 F8 00 4D 0E 00 00 05 00 00 05 00 10 D1 80 05 E0 C0 F8 F6 F0 BA F0 FF FF BE FE FD C2 E1 82 03 FE 10 5D BE 3B FE 00 00 00 00 00 02 00 01 00 00 82 00 80 01 00 80 F1 F8 80 FE FF F8 FE FF FE FF FC FD EA C9 F1 0C 05 7C 00 0F 8E 4D 40 01 00 08 00
+[07:26:36.767] TICK #10092  avail=88  totalBytes=1659  streamON=0  parseState=0
+[07:26:36.768] RX tick=10092  bytes=88  total=1747  hex: 00 03 00 00 1D 10 00 00 16 00 1F F2 C0 3C 5F 1E C1 C0 3F 4D 3E E0 FD FF B2 E2 04 82 3F 90 47 80 04 9A 6D 40 02 00 00 00 00 00 01 00 00 01 00 1D 00 03 01 01 01 00 E0 00 E0 E0 F8 C1 F0 E2 D4 FE F1 FD FF FF FF FF FC AA C4 41 82 FB 10 02 9F E0 00 00 00 01 02 00 00 00
+[07:26:36.799] TICK #10093  avail=120  totalBytes=1747  streamON=0  parseState=0
+[07:26:36.800] RX tick=10093  bytes=120  total=1867  hex: 01 00 00 00 80 40 00 00 03 14 3F C0 C0 E2 F8 C0 FD FC D0 FE FF E2 FE F4 FC FE F0 EA 94 6B 50 01 9E A0 01 01 6C 00 19 5D 00 00 00 00 01 41 00 00 C1 CA 00 0C 80 7C 1F 45 1C ED E0 FF FF F0 FC FE E2 FE FF FF FF FF FF FF F6 F2 50 FF FC 00 9A 80 07 00 00 01 00 00 00 00 01 00 02 00 02 62 00 00 00 10 09 02 80 E0 D4 51 C0 3E 8E 1F F0 C0 3F F6 64 F1 BF F1 FF F7 FF FF
+[07:26:36.861] TICK #10095  avail=131  totalBytes=1867  streamON=0  parseState=0
+[07:26:36.862] RX tick=10095  bytes=131  total=1998  hex: FF FE F5 F9 F5 F0 89 13 F7 00 C8 02 00 00 02 09 00 00 00 03 02 0A E0 80 00 10 C4 00 47 00 40 7D 12 E0 E0 17 3E FF C8 F8 1F FD E0 FD FC FE FD FE FF FC FF F7 C1 E1 EA 00 82 FB 10 5D 80 01 7B 80 0F 05 03 06 00 00 00 00 02 00 05 80 00 05 00 20 00 03 05 1F 00 60 00 5F 29 C0 F0 F0 E2 FF E2 F0 7F FF E8 FC F1 FF FC F1 FF FD FF F4 77 FF FB 46 08 FF E0 82 02 7F 00 7D 80 02 9A 05 E0 00 02 02 01 00 00
+[07:26:36.893] TICK #10096  avail=129  totalBytes=1998  streamON=0  parseState=0
+[07:26:36.894] RX tick=10096  bytes=129  total=2127  hex: 01 01 02 00 00 00 00 36 00 00 02 00 01 00 FF 0A 01 80 47 00 80 FF F0 FF FE E1 ED E1 F8 FD FA FD FF F1 FF 7E F8 FC 7A 0F 18 FF C0 00 7A 24 CF 02 10 01 C0 01 FF 00 11 02 00 00 00 00 00 01 00 00 00 02 00 40 01 04 00 0F 00 00 16 08 00 80 C0 81 FE C0 0B E0 E0 57 1F FF E0 1B 5F C0 F1 FC FC BE F4 FE FE FE FF FF FF FF FE FC 7C C1 C2 7D FF C0 57 5D 10 FC C0 27 D8 00 00 01 02 0D 00 06 08 00 00
+[07:26:36.954] TICK #10098  avail=244  totalBytes=2127  streamON=0  parseState=0
+[07:26:36.956] RX tick=10098  bytes=244  total=2371  hex: 00 00 00 00 00 00 00 03 02 00 0D 00 80 05 00 C0 40 41 C0 40 F0 C0 71 80 E0 F0 13 C0 F4 F0 C1 E0 E3 F0 F8 E0 EA F5 FE FF FE FF F5 FF FE FF FF FE F8 FE FF E0 F8 F0 FE 3F F0 80 56 01 00 C1 00 00 00 03 02 41 12 00 00 00 02 01 00 02 00 00 01 00 00 00 00 00 A0 00 00 38 00 00 00 79 00 00 40 D3 E0 00 80 7C 0F 3E 80 E2 FA 82 14 FF 3C FF C4 4F F8 8B EE F6 FC FF F2 FF FC FF FF FE FF FC E1 BE 3F 7F FE F0 5F E2 C1 FD 1A 10 C0 00 00 80 00 00 00 50 02 00 00 00 0F 00 00 00 00 01 00 00 00 00 00 80 01 41 80 00 00 00 01 00 F1 01 0F 00 50 02 01 1F F1 2E 00 00 5C F8 02 E5 FC BF FC 13 1E FD FC F8 F9 F8 1E E2 FE FF FE FF FE FD FF FE FF FF FF D3 FF F0 F9 F8 FD F8 F8 F8 F4 FF 28 C0 B0 F9 00 FE F1 3E 04 41 00 78 FE 00 00 60 00 0E 0E 00 00 00 00 00
+[07:26:36.985] TICK #10099  avail=200  totalBytes=2371  streamON=0  parseState=0
+[07:26:36.986] RX tick=10099  bytes=200  total=2571  hex: 00 00 00 00 02 00 02 00 00 02 01 07 00 00 1D 08 00 06 80 03 00 D0 00 C0 80 00 00 F0 40 82 C0 E0 FD F0 F0 E0 FC FA E4 E7 FC FA F4 FA FF FF FF FF FF FF FB FF FE F0 E8 FF FF E0 7B F0 7C F0 C0 71 E8 80 E2 C1 80 70 D0 02 00 FC 00 00 80 41 00 07 7C 03 01 00 00 01 00 00 00 00 00 01 01 00 00 00 04 00 01 04 01 00 00 00 07 80 01 00 00 F8 20 FE C0 F8 F0 E2 80 06 71 DD C0 1E BF 3E FD 80 FE 2C E0 F8 59 A2 FF FE E0 FF FF FF BE FA FF FF FE FF DF FF FD FF FF FE FF EE FF FE F4 FF FF FF FE F0 FC AE F8 FC F7 FE C4 1A F0 7F F0 15 10 1F BF D0 60 FF 00 00 F0 00 04 82 00 1E 39 DD 02 00 14 00 00 05 00 00 01 00 00 00
+[07:26:37.016] TICK #10100  avail=0  totalBytes=2571  streamON=0  parseState=0
+[07:26:37.047] TICK #10101  avail=163  totalBytes=2571  streamON=0  parseState=0
+[07:26:37.048] RX tick=10101  bytes=163  total=2734  hex: 00 02 00 00 05 00 20 01 02 00 50 08 1D 1F 00 00 00 50 DC 10 40 1E 08 00 F4 E8 05 3C C1 3D 78 FF 7C F0 11 DE D0 0E F1 E0 C2 FD 80 C1 F6 C1 80 EA 80 80 EE E0 80 F0 E0 FF D0 F2 F7 E4 C0 E8 F3 80 F0 A0 90 F4 C1 00 D4 01 00 01 00 00 01 C0 C0 F8 80 00 01 01 80 05 03 01 01 00 09 01 00 00 00 00 00 00 00 00 00 02 00 48 00 00 00 00 00 0F 0E 00 01 47 00 00 00 20 17 00 00 F0 01 01 00 00 00 03 00 01 11 00 00 C5 02 00 00 00 7E 00 43 00 80 C2 00 7E 00 0F 00 00 00 01 15 01 02 00 02 01 00 00 00 00 00
+[07:26:37.078] TICK #10102  avail=15  totalBytes=2734  streamON=0  parseState=0
+[07:26:37.078] RX tick=10102  bytes=15  total=2749  hex: 00 00 00 00 00 01 00 00 02 00 00 01 00 00 00
+[07:26:38.607] TICK #10150  avail=0  totalBytes=2749  streamON=0  parseState=0
+[07:26:40.193] TICK #10200  avail=0  totalBytes=2749  streamON=0  parseState=0
+[07:26:41.750] TICK #10250  avail=0  totalBytes=2749  streamON=0  parseState=0
+[07:26:43.309] TICK #10300  avail=0  totalBytes=2749  streamON=0  parseState=0
+[07:26:44.863] TICK #10350  avail=0  totalBytes=2749  streamON=0  parseState=0
+[07:26:46.421] TICK #10400  avail=0  totalBytes=2749  streamON=0  parseState=0
+[07:26:47.976] TICK #10450  avail=0  totalBytes=2749  streamON=0  parseState=0
+[07:26:49.533] TICK #10500  avail=0  totalBytes=2749  streamON=0  parseState=0
+[07:26:51.088] TICK #10550  avail=0  totalBytes=2749  streamON=0  parseState=0
+[07:26:52.643] TICK #10600  avail=0  totalBytes=2749  streamON=0  parseState=0
+[07:26:54.199] TICK #10650  avail=0  totalBytes=2749  streamON=0  parseState=0
+[07:26:55.757] TICK #10700  avail=0  totalBytes=2749  streamON=0  parseState=0
+[07:26:56.626] TICK #10728  avail=10  totalBytes=2749  streamON=0  parseState=0
+[07:26:56.627] RX tick=10728  bytes=10  total=2759  hex: AA 00 F8 00 FF FD 10 00 00 00
+[07:26:57.313] TICK #10750  avail=0  totalBytes=2759  streamON=0  parseState=0
+[07:26:58.875] TICK #10800  avail=0  totalBytes=2759  streamON=0  parseState=0
+[07:27:00.433] TICK #10850  avail=0  totalBytes=2759  streamON=0  parseState=0
+[07:27:01.988] TICK #10900  avail=0  totalBytes=2759  streamON=0  parseState=0
+[07:27:03.546] TICK #10950  avail=0  totalBytes=2759  streamON=0  parseState=0
+[07:27:05.107] TICK #11000  avail=0  totalBytes=2759  streamON=0  parseState=0
+[07:27:06.664] TICK #11050  avail=0  totalBytes=2759  streamON=0  parseState=0
+[07:27:08.222] TICK #11100  avail=0  totalBytes=2759  streamON=0  parseState=0
+[07:27:09.782] TICK #11150  avail=0  totalBytes=2759  streamON=0  parseState=0
+[07:27:11.344] TICK #11200  avail=0  totalBytes=2759  streamON=0  parseState=0
+[07:27:12.902] TICK #11250  avail=0  totalBytes=2759  streamON=0  parseState=0
+[07:27:14.354] TICK #11300  avail=0  totalBytes=2759  streamON=0  parseState=0
+[07:27:15.410] TICK #11350  avail=0  totalBytes=2759  streamON=0  parseState=0
+[07:27:16.473] TICK #11400  avail=0  totalBytes=2759  streamON=0  parseState=0
+[07:27:17.684] TICK #11450  avail=0  totalBytes=2759  streamON=0  parseState=0
+[07:27:18.864] TICK #11500  avail=0  totalBytes=2759  streamON=0  parseState=0
+[07:27:19.915] TICK #11550  avail=0  totalBytes=2759  streamON=0  parseState=0
+[07:27:21.032] TICK #11600  avail=0  totalBytes=2759  streamON=0  parseState=0
+[07:27:22.217] TICK #11650  avail=0  totalBytes=2759  streamON=0  parseState=0
+[07:27:23.382] TICK #11700  avail=0  totalBytes=2759  streamON=0  parseState=0
+[07:27:24.510] TICK #11750  avail=0  totalBytes=2759  streamON=0  parseState=0
