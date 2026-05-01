@@ -8,7 +8,7 @@ clear all; clc; close all;
 % --- Valores para la Ecuación 1 (Figura 2) ---
 R1_1 = 82e3;  
 R2_1 = 750e3;
-R5_1 = 82e3;
+R5_1 = 80e3;
 C3_1 = 44e-6; 
 C4_1 = 1e-9;
 
