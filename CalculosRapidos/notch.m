@@ -1,41 +1,45 @@
 close all; clear; clc;
-% Parámetros del Filtro
-Fs = 1020;              
-f_notch = 50;           
-bw =10;                 
-atenuacion_db = 30;     
-
-% Definición de bandas
-f1 = f_notch - bw;
-f2 = f_notch - 0.5;
-f3 = f_notch + 0.5;
-f4 = f_notch + bw;
-
-% Tolerancias (Rizado)
-dev = [(10^(0.1/20)-1)/(10^(0.1/20)+1)  10^(-atenuacion_db/20)  (10^(0.1/20)-1)/(10^(0.1/20)+1)];
-
-% Estimación de orden
-[n, fo, ao, w] = firpmord([f1 f2 f3 f4], [1 0 1], dev, Fs);
-
-% --- CORRECCIÓN CRÍTICA ---
-% Si el orden es muy bajo o impar, firpm puede fallar en filtros Notch.
-if n < 40
-    n = 40; % Forzamos un mínimo para asegurar que la muesca exista
-end
-if mod(n,2) ~= 0
-    n = n + 1; % Aseguramos que sea par para un filtro Simétrico Tipo I
-end
-
-% Generación de coeficientes
-try
-    % firls es mucho más estable para bandas de transición estrechas
-    b = firls(n, fo, ao, w);
-catch
-    % Si falla con firpmord, usamos un diseño por ventana que es más robusto
-    disp('firpm falló, usando diseño por ventana (fir1)...');
-    b = fir1(n, [f2 f3]/(Fs/2), 'stop');
-end
-
+% % Parámetros del Filtro
+% Fs = 1020;              
+% f_notch = 50;           
+% bw =10;                 
+% atenuacion_db = 30;     
+% 
+% % Definición de bandas
+% f1 = f_notch - bw;
+% f2 = f_notch - 0.5;
+% f3 = f_notch + 0.5;
+% f4 = f_notch + bw;
+% 
+% % Tolerancias (Rizado)
+% dev = [(10^(0.1/20)-1)/(10^(0.1/20)+1)  10^(-atenuacion_db/20)  (10^(0.1/20)-1)/(10^(0.1/20)+1)];
+% 
+% % Estimación de orden
+% [n, fo, ao, w] = firpmord([f1 f2 f3 f4], [1 0 1], dev, Fs);
+% 
+% % --- CORRECCIÓN CRÍTICA ---
+% % Si el orden es muy bajo o impar, firpm puede fallar en filtros Notch.
+% if n < 40
+%     n = 40; % Forzamos un mínimo para asegurar que la muesca exista
+% end
+% if mod(n,2) ~= 0
+%     n = n + 1; % Aseguramos que sea par para un filtro Simétrico Tipo I
+% end
+% 
+% % Generación de coeficientes
+% try
+%     % firls es mucho más estable para bandas de transición estrechas
+%     b = firls(n, fo, ao, w);
+% catch
+%     % Si falla con firpmord, usamos un diseño por ventana que es más robusto
+%     disp('firpm falló, usando diseño por ventana (fir1)...');
+%     b = fir1(n, [f2 f3]/(Fs/2), 'stop');
+% end
+atenuacion_db = 40;
+n = 400;
+Fs = 1020;
+f_notch = 50;
+b = firpm(400, [0 45, 49 51, 55 90, 100 510]/510, [1 1, 0 0, 1 1, 0 0], [1, 1/(10^(-40 / 20)), 1, 1/(10^(-100 / 20))])
 % --- Generación del archivo .h ---
 fileID = fopen('coeficientes_notch.h', 'w');
 fprintf(fileID, '/* Generado para Atenuacion: %d dB - Orden: %d */\n', atenuacion_db, n);
@@ -61,4 +65,4 @@ ylabel('Magnitud (dB)'); axis([f_notch-20 f_notch+20 -atenuacion_db-10 5]);
 subplot(2,1,2);
 plot(f, unwrap(angle(h)) * 180/pi, 'LineWidth', 1.5, 'Color', [0.85 0.32 0.1]);
 grid on; ylabel('Fase (grados)'); xlabel('Frecuencia (Hz)');
-axis([f_notch-20 f_notch+20 -180*n/10 100]);
+axis([f_notch-20 Fs/2 -180*n/10 100]);

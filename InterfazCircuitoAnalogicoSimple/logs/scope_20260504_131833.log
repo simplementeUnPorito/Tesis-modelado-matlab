@@ -1,0 +1,6 @@
+=== geophone_scope_simple — 04-May-2026 13:18:33 ===
+[13:18:33.207] Conectado COM6 @ 115200
+[13:18:34.006] --- Stream ON ---
+[13:18:34.382] TICK #21800  avail=0  bytes=3872742  ON=1  ps=0  pi=0
+[13:18:35.949] TICK #21850  avail=0  bytes=3872742  ON=1  ps=0  pi=0
+[13:18:37.546] TICK #21900  avail=0  bytes=3872742  ON=1  ps=0  pi=0
