@@ -1,0 +1,923 @@
+=== geophone_scope_simple — 10-May-2026 22:48:19 ===
+[22:48:19.582] Conectado COM6 @ 115200
+[22:48:19.583] Solicitando config al PSoC (0xA5)...
+[22:48:21.620] WARN: config incompleta (tipo2=0 tipo3=0) — usando defaults
+[22:48:21.621] WARN: sin respuesta de servo (0x04/0x05)
+[22:48:21.622] WARN: sin nominal VDAC (0x06)
+[22:48:21.657] TICK #2  avail=4  bytes=0  ON=0  ps=0  pi=0
+  RAW[4]: 4B 63 4B 00 
+[22:48:21.684] Servo → PSoC: vent=1.33s→2000samp  umbral=100.00mV→65535cnt  conv=5s  pN=147 nN=148 ±tol=0
+[22:48:24.024] Servo WARN: confirmación parcial (0x04=0 0x05=0 0x06=0)
+[22:48:24.055] TICK #4  avail=6  bytes=4  ON=0  ps=0  pi=0
+  RAW[6]: 7F 0B 49 01 00 80 
+[22:48:24.080] TICK #5  avail=10  bytes=10  ON=0  ps=0  pi=0
+  RAW[10]: 29 A1 25 85 00 D0 59 41 00 01 
+[22:48:24.127] TICK #7  avail=6  bytes=20  ON=0  ps=0  pi=0
+  RAW[6]: C4 E9 4A 00 00 10 
+[22:48:24.149] TICK #8  avail=10  bytes=26  ON=0  ps=0  pi=0
+  RAW[10]: 5F 5B 00 00 CC 5B 5A 25 04 20 
+[22:48:24.196] TICK #10  avail=8  bytes=36  ON=0  ps=0  pi=0
+  RAW[8]: 6F 40 00 00 D0 5B 4B 80 
+[22:48:24.217] TICK #11  avail=5  bytes=44  ON=0  ps=0  pi=0
+  RAW[5]: F9 49 04 00 00 
+[22:48:24.260] TICK #13  avail=10  bytes=49  ON=0  ps=0  pi=0
+  RAW[10]: 5A 52 08 00 C0 4B 02 00 00 00 
+[22:48:24.282] TICK #14  avail=9  bytes=59  ON=0  ps=0  pi=0
+  RAW[9]: 5B 02 01 FC 5B 92 25 00 00 
+[22:48:24.324] TICK #16  avail=7  bytes=68  ON=0  ps=0  pi=0
+  RAW[7]: 00 6B 0A 80 04 00 E4 
+[22:48:24.345] TICK #17  avail=10  bytes=75  ON=0  ps=0  pi=0
+  RAW[10]: 6D 09 01 00 80 7F 4A 20 05 88 
+[22:48:24.388] TICK #19  avail=10  bytes=85  ON=0  ps=0  pi=0
+  RAW[10]: 7F 41 20 00 00 E8 5B 29 01 00 
+[22:48:24.431] TICK #21  avail=7  bytes=95  ON=0  ps=0  pi=0
+  RAW[7]: C8 7D 01 21 00 00 89 
+[22:48:24.452] TICK #22  avail=11  bytes=102  ON=0  ps=0  pi=0
+  RAW[11]: DE 09 09 01 00 F1 4B 0A 24 01 84 
+[22:48:24.496] TICK #24  avail=10  bytes=113  ON=0  ps=0  pi=0
+  RAW[10]: 5B 51 20 09 00 C4 4F 69 49 01 
+[22:48:24.518] TICK #25  avail=7  bytes=123  ON=0  ps=0  pi=0
+  RAW[7]: A0 FF 49 41 01 00 48 
+[22:48:24.561] TICK #27  avail=11  bytes=130  ON=0  ps=0  pi=0
+  RAW[11]: 4F 01 00 28 CD 5F 05 09 08 00 00 
+[22:48:24.582] TICK #28  avail=8  bytes=141  ON=0  ps=0  pi=0
+  RAW[8]: 0B 08 20 E0 7B 2D 48 00 
+[22:48:24.624] TICK #30  avail=13  bytes=149  ON=0  ps=0  pi=0
+  RAW[13]: F0 7B 13 20 01 00 00 40 FF FF 6B 68 00 
+[22:48:24.667] TICK #32  avail=8  bytes=162  ON=0  ps=0  pi=0
+  RAW[8]: 00 D0 FF 4B 48 00 00 80 
+[22:48:24.689] TICK #33  avail=11  bytes=170  ON=0  ps=0  pi=0
+  RAW[11]: DF 24 2D 00 C0 4B 50 4B 08 00 80 
+[22:48:24.733] TICK #35  avail=11  bytes=181  ON=0  ps=0  pi=0
+  RAW[11]: 7F 05 4B 00 00 E8 6B 25 0B 00 00 
+[22:48:24.755] TICK #36  avail=8  bytes=192  ON=0  ps=0  pi=0
+  RAW[8]: E0 FF 7F 09 4B 00 00 E0 
+[22:48:24.798] TICK #38  avail=11  bytes=200  ON=0  ps=0  pi=0
+  RAW[11]: 6F A4 4B 20 EC 5F 20 0B 00 00 C0 
+[22:48:24.819] TICK #39  avail=10  bytes=211  ON=0  ps=0  pi=0
+  RAW[10]: 5B A4 0B 00 00 4B 2C 29 00 00 
+[22:48:24.862] TICK #41  avail=7  bytes=221  ON=0  ps=0  pi=0
+  RAW[7]: 84 69 48 4B 00 00 80 
+[22:48:24.883] TICK #42  avail=13  bytes=228  ON=0  ps=0  pi=0
+  RAW[13]: FF 5B 25 01 00 80 FF 5B 40 49 00 00 F4 
+[22:48:24.926] TICK #44  avail=10  bytes=241  ON=0  ps=0  pi=0
+  RAW[10]: DB 08 4B 08 00 F4 5B 43 4B 01 
+[22:48:24.969] TICK #46  avail=6  bytes=251  ON=0  ps=0  pi=0
+  RAW[6]: 80 4F 48 01 04 E8 
+[22:48:24.991] TICK #47  avail=11  bytes=257  ON=0  ps=0  pi=0
+  RAW[11]: 6B 48 01 00 80 4B 2D 09 00 00 80 
+[22:48:25.035] TICK #49  avail=11  bytes=268  ON=0  ps=0  pi=0
+  RAW[11]: 7F 29 6B 00 01 F8 6B 00 69 01 00 
+[22:48:25.057] TICK #50  avail=7  bytes=279  ON=0  ps=0  pi=0
+  RAW[7]: E0 DF 01 4B 00 00 F8 
+[22:48:25.101] TICK #52  avail=11  bytes=286  ON=0  ps=0  pi=0
+  RAW[11]: DB 05 4B 01 00 E0 03 4B 00 00 CC 
+[22:48:25.123] TICK #53  avail=9  bytes=297  ON=0  ps=0  pi=0
+  RAW[9]: 4B 49 09 00 00 6F 40 4B 68 
+[22:48:25.165] TICK #55  avail=7  bytes=306  ON=0  ps=0  pi=0
+  RAW[7]: 80 8B 43 4B 00 00 00 
+[22:48:25.188] TICK #56  avail=11  bytes=313  ON=0  ps=0  pi=0
+  RAW[11]: 5B 2D 09 00 F1 6A 41 0B 00 00 F0 
+[22:48:25.230] TICK #58  avail=8  bytes=324  ON=0  ps=0  pi=0
+  RAW[8]: 4B 5B 0B 00 FA 43 05 00 
+[22:48:25.273] TICK #60  avail=6  bytes=332  ON=0  ps=0  pi=0
+  RAW[6]: F1 4F 0A 4B 00 80 
+[22:48:25.296] TICK #61  avail=11  bytes=338  ON=0  ps=0  pi=0
+  RAW[11]: 5B 68 4B 00 00 FA 5B 2D 0B 00 C0 
+[22:48:25.339] TICK #63  avail=9  bytes=349  ON=0  ps=0  pi=0
+  RAW[9]: 1B 25 00 00 80 5B 2D 01 00 
+[22:48:25.361] TICK #64  avail=6  bytes=358  ON=0  ps=0  pi=0
+  RAW[6]: 80 41 4B 00 00 DC 
+[22:48:25.404] TICK #66  avail=11  bytes=364  ON=0  ps=0  pi=0
+  RAW[11]: 4D 61 41 00 00 80 4B B4 08 00 00 
+[22:48:25.426] TICK #67  avail=10  bytes=375  ON=0  ps=0  pi=0
+  RAW[10]: 45 48 08 00 E0 5F 01 41 00 00 
+[22:48:25.469] TICK #69  avail=6  bytes=385  ON=0  ps=0  pi=0
+  RAW[6]: 84 7B D0 0B 00 C4 
+[22:48:25.492] TICK #70  avail=10  bytes=391  ON=0  ps=0  pi=0
+  RAW[10]: 5B 69 0B 00 E8 5B A4 01 00 00 
+[22:48:25.534] TICK #72  avail=9  bytes=401  ON=0  ps=0  pi=0
+  RAW[9]: 5B 25 0B 00 00 80 6B 43 00 
+[22:48:25.557] TICK #73  avail=5  bytes=410  ON=0  ps=0  pi=0
+  RAW[5]: E0 49 42 00 CD 
+[22:48:25.599] TICK #75  avail=9  bytes=415  ON=0  ps=0  pi=0
+  RAW[9]: 4B 02 00 A4 5B A5 03 00 FC 
+[22:48:25.642] TICK #77  avail=9  bytes=424  ON=0  ps=0  pi=0
+  RAW[9]: 6B 69 03 00 00 00 51 01 00 
+[22:48:25.663] TICK #78  avail=8  bytes=433  ON=0  ps=0  pi=0
+  RAW[8]: C0 FF 2D 08 F4 7B 49 09 
+[22:48:25.705] TICK #80  avail=6  bytes=441  ON=0  ps=0  pi=0
+  RAW[6]: 00 90 5F 25 00 C0 
+[22:48:25.727] TICK #81  avail=8  bytes=447  ON=0  ps=0  pi=0
+  RAW[8]: 6B 0A 00 00 E5 0B 69 01 
+[22:48:25.770] TICK #83  avail=10  bytes=455  ON=0  ps=0  pi=0
+  RAW[10]: D0 5B 2D 01 00 DA 5B 42 00 00 
+[22:48:25.791] TICK #84  avail=6  bytes=465  ON=0  ps=0  pi=0
+  RAW[6]: F4 1F 49 21 00 E0 
+[22:48:25.835] TICK #86  avail=8  bytes=471  ON=0  ps=0  pi=0
+  RAW[8]: EB 43 05 E0 4F 4B 09 00 
+[22:48:25.856] TICK #87  avail=10  bytes=479  ON=0  ps=0  pi=0
+  RAW[10]: D8 5B 4A 00 F6 5B 5B 4A 00 00 
+[22:48:25.898] TICK #89  avail=5  bytes=489  ON=0  ps=0  pi=0
+  RAW[5]: FA 53 21 04 F4 
+[22:48:25.941] TICK #91  avail=11  bytes=494  ON=0  ps=0  pi=0
+  RAW[11]: 7B 5A 49 01 C0 4F 4B 00 00 00 AA 
+[22:48:25.962] TICK #92  avail=8  bytes=505  ON=0  ps=0  pi=0
+  RAW[8]: 5F 6C 02 00 E0 4B 01 00 
+[22:48:25.989] PGA cmd enviado: 32x (code 0x06) — esperando confirmación...
+[22:48:26.979] PGA cmd enviado: 32x (code 0x06) — esperando confirmación...
+[22:48:27.048] PGA: error leyendo confirmación — Dimensions of arrays being concatenated are not consistent.
+[22:48:27.049] PGA WARN: sin confirmación del PSoC — verifica la conexión
+[22:48:27.052] PGA WARN: sin confirmación del PSoC — verifica la conexión
+[22:48:27.076] TICK #95  avail=7  bytes=513  ON=0  ps=0  pi=0
+  RAW[7]: DB 08 00 80 DB 00 04 
+[22:48:27.100] TICK #96  avail=5  bytes=520  ON=0  ps=0  pi=0
+  RAW[5]: C0 23 01 00 F8 
+[22:48:27.143] TICK #98  avail=10  bytes=525  ON=0  ps=0  pi=0
+  RAW[10]: DB 02 00 00 E4 FF 7F 13 00 C0 
+[22:48:27.164] TICK #99  avail=9  bytes=535  ON=0  ps=0  pi=0
+  RAW[9]: 7F 2B 00 00 80 FB 48 08 00 
+[22:48:27.186] TICK #100  avail=0  bytes=544  ON=0  ps=0  pi=0
+[22:48:27.207] TICK #101  avail=5  bytes=544  ON=0  ps=0  pi=0
+  RAW[5]: F4 7B 0B 00 FC 
+[22:48:27.229] TICK #102  avail=9  bytes=549  ON=0  ps=0  pi=0
+  RAW[9]: FB 6F 40 00 D0 5B 48 00 EA 
+[22:48:27.272] TICK #104  avail=9  bytes=558  ON=0  ps=0  pi=0
+  RAW[9]: 5B 7D 0A 00 00 00 5A 04 00 
+[22:48:27.293] TICK #105  avail=5  bytes=567  ON=0  ps=0  pi=0
+  RAW[5]: FC DD 0A 01 C0 
+[22:48:27.336] TICK #107  avail=9  bytes=572  ON=0  ps=0  pi=0
+  RAW[9]: 5B 2D 09 00 F9 41 00 00 F8 
+[22:48:27.377] TICK #109  avail=8  bytes=581  ON=0  ps=0  pi=0
+  RAW[8]: FF 4B 00 F4 4F 29 00 00 
+[22:48:27.398] TICK #110  avail=5  bytes=589  ON=0  ps=0  pi=0
+  RAW[5]: F0 1B 09 00 E0 
+[22:48:27.441] TICK #112  avail=9  bytes=594  ON=0  ps=0  pi=0
+  RAW[9]: 5B 00 00 00 F8 5F 08 00 E0 
+[22:48:27.463] TICK #113  avail=9  bytes=603  ON=0  ps=0  pi=0
+  RAW[9]: DB 49 00 00 E0 FB 82 41 00 
+[22:48:27.506] TICK #115  avail=6  bytes=612  ON=0  ps=0  pi=0
+  RAW[6]: 80 DB 41 01 00 E0 
+[22:48:27.527] TICK #116  avail=8  bytes=618  ON=0  ps=0  pi=0
+  RAW[8]: 4B 0A 00 D0 EF 41 00 EA 
+[22:48:27.569] TICK #118  avail=8  bytes=626  ON=0  ps=0  pi=0
+  RAW[8]: 7F 01 08 80 BD 43 00 00 
+[22:48:27.611] TICK #120  avail=6  bytes=634  ON=0  ps=0  pi=0
+  RAW[6]: F8 5B DE 01 00 FC 
+[22:48:27.632] TICK #121  avail=7  bytes=640  ON=0  ps=0  pi=0
+  RAW[7]: 49 00 00 F0 7B 09 E2 
+[22:48:27.674] TICK #123  avail=8  bytes=647  ON=0  ps=0  pi=0
+  RAW[8]: 4B 92 00 00 80 5F 2D 00 
+[22:48:27.696] TICK #124  avail=6  bytes=655  ON=0  ps=0  pi=0
+  RAW[6]: EC 7F 01 00 00 F8 
+[22:48:27.738] TICK #126  avail=10  bytes=661  ON=0  ps=0  pi=0
+  RAW[10]: F7 49 00 00 FC 5B 40 00 40 FF 
+[22:48:27.781] TICK #128  avail=9  bytes=671  ON=0  ps=0  pi=0
+  RAW[9]: DF 05 00 00 E0 5F 09 00 00 
+[22:48:27.804] TICK #129  avail=9  bytes=680  ON=0  ps=0  pi=0
+  RAW[9]: E0 7D 49 20 00 FC 5B 29 08 
+[22:48:27.847] TICK #131  avail=5  bytes=689  ON=0  ps=0  pi=0
+  RAW[5]: FC 5F 02 00 EC 
+[22:48:27.868] TICK #132  avail=9  bytes=694  ON=0  ps=0  pi=0
+  RAW[9]: 4B 48 01 00 F0 FF 49 00 01 
+[22:48:27.911] TICK #134  avail=9  bytes=703  ON=0  ps=0  pi=0
+  RAW[9]: F4 FF 42 01 00 FE FF 42 04 
+[22:48:27.933] TICK #135  avail=6  bytes=712  ON=0  ps=0  pi=0
+  RAW[6]: ED 7F 5B 00 00 D0 
+[22:48:27.975] TICK #137  avail=9  bytes=718  ON=0  ps=0  pi=0
+  RAW[9]: FF 5B 05 00 E4 7B 4B 01 EC 
+[22:48:27.996] TICK #138  avail=8  bytes=727  ON=0  ps=0  pi=0
+  RAW[8]: DB 0D 00 00 FC 5B 49 00 
+[22:48:28.039] TICK #140  avail=5  bytes=735  ON=0  ps=0  pi=0
+  RAW[5]: FF 7F 4B 00 60 
+[22:48:28.061] TICK #141  avail=8  bytes=740  ON=0  ps=0  pi=0
+  RAW[8]: DF 42 00 E8 7F 4B 00 00 
+[22:48:28.104] TICK #143  avail=10  bytes=748  ON=0  ps=0  pi=0
+  RAW[10]: C8 7B 0A 00 00 F1 4B 01 00 00 
+[22:48:28.146] TICK #145  avail=6  bytes=758  ON=0  ps=0  pi=0
+  RAW[6]: FF 5F 4B 00 00 D4 
+[22:48:28.168] TICK #146  avail=9  bytes=764  ON=0  ps=0  pi=0
+  RAW[9]: FB 49 00 00 F6 FF 0B 04 00 
+[22:48:28.210] TICK #148  avail=8  bytes=773  ON=0  ps=0  pi=0
+  RAW[8]: E7 7B 10 00 F6 FF 49 00 
+[22:48:28.233] TICK #149  avail=5  bytes=781  ON=0  ps=0  pi=0
+  RAW[5]: F9 5F 02 01 D0 
+[22:48:28.255] TICK #150  avail=0  bytes=786  ON=0  ps=0  pi=0
+[22:48:28.275] TICK #151  avail=10  bytes=786  ON=0  ps=0  pi=0
+  RAW[10]: FF 13 04 00 D0 5F 4A 00 00 C8 
+[22:48:28.296] TICK #152  avail=7  bytes=796  ON=0  ps=0  pi=0
+  RAW[7]: 5B 48 00 E8 5B 09 00 
+[22:48:28.339] TICK #154  avail=5  bytes=803  ON=0  ps=0  pi=0
+  RAW[5]: EC 51 00 00 E4 
+[22:48:28.381] TICK #156  avail=9  bytes=808  ON=0  ps=0  pi=0
+  RAW[9]: FB 10 08 00 FC 7F 90 00 D0 
+[22:48:28.403] TICK #157  avail=9  bytes=817  ON=0  ps=0  pi=0
+  RAW[9]: 7F 0A 00 00 88 FF 4B 00 00 
+[22:48:28.446] TICK #159  avail=5  bytes=826  ON=0  ps=0  pi=0
+  RAW[5]: A0 79 50 00 14 
+[22:48:28.468] TICK #160  avail=8  bytes=831  ON=0  ps=0  pi=0
+  RAW[8]: FB 09 00 8B 0B 02 00 E0 
+[22:48:28.510] TICK #162  avail=8  bytes=839  ON=0  ps=0  pi=0
+  RAW[8]: 5B 01 00 20 FF 7F 41 00 
+[22:48:28.531] TICK #163  avail=5  bytes=847  ON=0  ps=0  pi=0
+  RAW[5]: A0 5F 0A 00 28 
+[22:48:28.574] TICK #165  avail=9  bytes=852  ON=0  ps=0  pi=0
+  RAW[9]: DB 29 00 00 80 5B 21 00 80 
+[22:48:28.615] TICK #167  avail=7  bytes=861  ON=0  ps=0  pi=0
+  RAW[7]: 6B 00 00 00 08 5B 0A 
+[22:48:28.637] TICK #168  avail=7  bytes=868  ON=0  ps=0  pi=0
+  RAW[7]: C0 FF DB EB 08 00 A0 
+[22:48:28.679] TICK #170  avail=9  bytes=875  ON=0  ps=0  pi=0
+  RAW[9]: DF 05 00 40 4B 01 00 80 FF 
+[22:48:28.700] TICK #171  avail=9  bytes=884  ON=0  ps=0  pi=0
+  RAW[9]: 7F FF 5B 49 00 0C FE 49 08 
+[22:48:28.742] TICK #173  avail=7  bytes=893  ON=0  ps=0  pi=0
+  RAW[7]: 60 FF FF 49 00 00 92 
+[22:48:28.764] TICK #174  avail=8  bytes=900  ON=0  ps=0  pi=0
+  RAW[8]: 7B 0B 00 C8 5B 25 04 A0 
+[22:48:28.807] TICK #176  avail=8  bytes=908  ON=0  ps=0  pi=0
+  RAW[8]: 5F 04 00 80 FF E9 52 00 
+[22:48:28.851] TICK #178  avail=6  bytes=916  ON=0  ps=0  pi=0
+  RAW[6]: 40 5F 09 00 00 FE 
+[22:48:28.873] TICK #179  avail=11  bytes=922  ON=0  ps=0  pi=0
+  RAW[11]: 6D 00 00 AC DF DF 5B 49 00 A0 FF 
+[22:48:28.915] TICK #181  avail=8  bytes=933  ON=0  ps=0  pi=0
+  RAW[8]: DF 4F 02 00 A8 5D 00 00 
+[22:48:28.937] TICK #182  avail=6  bytes=941  ON=0  ps=0  pi=0
+  RAW[6]: AC 4B 09 00 40 FD 
+[22:48:28.979] TICK #184  avail=8  bytes=947  ON=0  ps=0  pi=0
+  RAW[8]: 5B 08 00 74 5E 09 00 C9 
+[22:48:29.002] TICK #185  avail=7  bytes=955  ON=0  ps=0  pi=0
+  RAW[7]: CB 01 00 F8 9A 02 00 
+[22:48:29.044] TICK #187  avail=6  bytes=962  ON=0  ps=0  pi=0
+  RAW[6]: 90 FF 5B 09 00 60 
+[22:48:29.067] TICK #188  avail=9  bytes=968  ON=0  ps=0  pi=0
+  RAW[9]: 4B 4A 00 C0 5B 5F 09 00 C8 
+[22:48:29.108] TICK #190  avail=8  bytes=977  ON=0  ps=0  pi=0
+  RAW[8]: CB 01 00 00 D8 DF 6B 02 
+[22:48:29.131] TICK #191  avail=6  bytes=985  ON=0  ps=0  pi=0
+  RAW[6]: E8 DA 01 00 00 FF 
+[22:48:29.172] TICK #193  avail=8  bytes=991  ON=0  ps=0  pi=0
+  RAW[8]: 7A 09 00 8C 5B 5B 01 A0 
+[22:48:29.214] TICK #195  avail=8  bytes=999  ON=0  ps=0  pi=0
+  RAW[8]: 4F 4B 00 CC 7F 69 49 00 
+[22:48:29.235] TICK #196  avail=5  bytes=1007  ON=0  ps=0  pi=0
+  RAW[5]: 10 6F 6D 01 90 
+[22:48:29.277] TICK #198  avail=9  bytes=1012  ON=0  ps=0  pi=0
+  RAW[9]: 5F 69 00 40 FF 4F 5B 01 A0 
+[22:48:29.319] TICK #200  avail=7  bytes=1021  ON=0  ps=0  pi=0
+  RAW[7]: 4B 69 00 E2 49 08 00 
+[22:48:29.342] TICK #201  avail=7  bytes=1028  ON=0  ps=0  pi=0
+  RAW[7]: D8 9F 1B 01 00 68 FF 
+[22:48:29.383] TICK #203  avail=9  bytes=1035  ON=0  ps=0  pi=0
+  RAW[9]: 5F 21 00 FC 5F 7B 03 58 FF 
+[22:48:29.405] TICK #204  avail=8  bytes=1044  ON=0  ps=0  pi=0
+  RAW[8]: 5B 49 0A 00 E0 49 01 00 
+[22:48:29.448] TICK #206  avail=5  bytes=1052  ON=0  ps=0  pi=0
+  RAW[5]: 2A DF 61 0B F4 
+[22:48:29.469] TICK #207  avail=8  bytes=1057  ON=0  ps=0  pi=0
+  RAW[8]: 7F 4B 00 DC DF 69 4B A0 
+[22:48:29.512] TICK #209  avail=8  bytes=1065  ON=0  ps=0  pi=0
+  RAW[8]: 5B 6B 03 00 60 4B 0A 00 
+[22:48:29.534] TICK #210  avail=8  bytes=1073  ON=0  ps=0  pi=0
+  RAW[8]: 20 FF 0B 0B 68 7F 4B 03 
+[22:48:29.577] TICK #212  avail=5  bytes=1081  ON=0  ps=0  pi=0
+  RAW[5]: C0 41 04 00 12 
+[22:48:29.619] TICK #214  avail=11  bytes=1086  ON=0  ps=0  pi=0
+  RAW[11]: 5F 2D 01 00 16 FF 5A 43 00 92 FF 
+[22:48:29.642] TICK #215  avail=8  bytes=1097  ON=0  ps=0  pi=0
+  RAW[8]: 5B 4B 00 00 4F 52 0B 00 
+[22:48:29.684] TICK #217  avail=6  bytes=1105  ON=0  ps=0  pi=0
+  RAW[6]: 92 DF DA 09 28 FF 
+[22:48:29.705] TICK #218  avail=8  bytes=1111  ON=0  ps=0  pi=0
+  RAW[8]: 4B 25 01 C2 5B 49 09 C0 
+[22:48:29.748] TICK #220  avail=8  bytes=1119  ON=0  ps=0  pi=0
+  RAW[8]: 7B 00 00 E0 FF 5B 01 00 
+[22:48:29.789] TICK #222  avail=7  bytes=1127  ON=0  ps=0  pi=0
+  RAW[7]: CC 7B 42 0A 00 10 FF 
+[22:48:29.812] TICK #223  avail=8  bytes=1134  ON=0  ps=0  pi=0
+  RAW[8]: 4B 03 00 08 4D 00 00 84 
+[22:48:29.855] TICK #225  avail=7  bytes=1142  ON=0  ps=0  pi=0
+  RAW[7]: 5A 4B 00 B0 5F 2D 01 
+[22:48:29.878] TICK #226  avail=5  bytes=1149  ON=0  ps=0  pi=0
+  RAW[5]: AA 7F 69 03 D8 
+[22:48:29.921] TICK #228  avail=9  bytes=1154  ON=0  ps=0  pi=0
+  RAW[9]: 53 6C 00 00 FF FB 4A 0B 40 
+[22:48:29.943] TICK #229  avail=9  bytes=1163  ON=0  ps=0  pi=0
+  RAW[9]: 5F 49 0B 00 00 FD 41 28 01 
+[22:48:30.007] TICK #230  avail=13  bytes=1172  ON=0  ps=0  pi=0
+  RAW[13]: D0 63 A4 01 FA 5F 41 09 F0 6B 03 00 F1 
+[22:48:30.049] TICK #232  avail=7  bytes=1185  ON=0  ps=0  pi=0
+  RAW[7]: 4B 20 01 F0 49 09 00 
+[22:48:30.071] TICK #233  avail=6  bytes=1192  ON=0  ps=0  pi=0
+  RAW[6]: CC 4B 80 04 40 FF 
+[22:48:30.114] TICK #235  avail=9  bytes=1198  ON=0  ps=0  pi=0
+  RAW[9]: 5F 0A 00 08 DF 4B 00 00 C8 
+[22:48:30.157] TICK #237  avail=7  bytes=1207  ON=0  ps=0  pi=0
+  RAW[7]: 9B 00 00 18 4B 00 00 
+[22:48:30.179] TICK #238  avail=5  bytes=1214  ON=0  ps=0  pi=0
+  RAW[5]: EA 1B 00 00 E0 
+[22:48:30.221] TICK #240  avail=11  bytes=1219  ON=0  ps=0  pi=0
+  RAW[11]: 59 00 00 00 DC DF 48 20 00 00 FF 
+[22:48:30.242] TICK #241  avail=7  bytes=1230  ON=0  ps=0  pi=0
+  RAW[7]: 4B 41 20 2C 4B 00 01 
+[22:48:30.287] TICK #243  avail=8  bytes=1237  ON=0  ps=0  pi=0
+  RAW[8]: EA FF 5F 21 20 00 80 FF 
+[22:48:30.308] TICK #244  avail=10  bytes=1245  ON=0  ps=0  pi=0
+  RAW[10]: 5F 4A 00 00 C0 FF 5F 01 00 D8 
+[22:48:30.351] TICK #246  avail=8  bytes=1255  ON=0  ps=0  pi=0
+  RAW[8]: 4B 0A 00 00 75 52 25 00 
+[22:48:30.373] TICK #247  avail=7  bytes=1263  ON=0  ps=0  pi=0
+  RAW[7]: 80 FF 4F 40 00 00 ED 
+[22:48:30.417] TICK #249  avail=12  bytes=1270  ON=0  ps=0  pi=0
+  RAW[12]: EF CB 6B 00 A8 FF FF 5F 6B 01 4C FF 
+[22:48:30.440] TICK #250  avail=12  bytes=1282  ON=0  ps=0  pi=0
+  RAW[12]: 7F 6B 4B 4B 00 80 FF EB 4B 6B 09 00 
+[22:48:30.483] TICK #252  avail=9  bytes=1294  ON=0  ps=0  pi=0
+  RAW[9]: CC 7F 6B 4B 09 00 A2 05 5B 
+[22:48:30.526] TICK #254  avail=8  bytes=1303  ON=0  ps=0  pi=0
+  RAW[8]: 68 00 7E EF 49 4B 49 A0 
+[22:48:30.571] TICK #255  avail=10  bytes=1311  ON=0  ps=0  pi=0
+  RAW[10]: 7F 49 49 00 74 FF 49 49 49 00 
+[22:48:30.593] TICK #256  avail=11  bytes=1321  ON=0  ps=0  pi=0
+  RAW[11]: A4 65 0B 4B 09 00 BC FF CD 6B 4A 
+[22:48:30.615] TICK #257  avail=9  bytes=1332  ON=0  ps=0  pi=0
+  RAW[9]: 0A 00 C6 53 4A 4B 00 00 D0 
+[22:48:30.659] TICK #259  avail=10  bytes=1341  ON=0  ps=0  pi=0
+  RAW[10]: 09 0A 49 01 B1 0F 4B 09 01 00 
+[22:48:30.701] TICK #260  avail=10  bytes=1351  ON=0  ps=0  pi=0
+  RAW[10]: ED 61 B4 4B 48 F8 29 40 0A 01 
+[22:48:30.744] TICK #261  avail=17  bytes=1361  ON=0  ps=0  pi=0
+  RAW[17]: E8 5B 28 69 20 00 E8 07 61 24 00 AA 5F 84 49 01 00 
+[22:48:30.787] TICK #263  avail=10  bytes=1378  ON=0  ps=0  pi=0
+  RAW[10]: E8 03 08 09 00 F0 57 00 49 00 
+[22:48:30.810] TICK #264  avail=4  bytes=1388  ON=0  ps=0  pi=0
+  RAW[4]: FD 07 00 DC 
+[22:48:30.857] TICK #266  avail=6  bytes=1392  ON=0  ps=0  pi=0
+  RAW[6]: 37 00 A0 4F 00 AA 
+[22:48:30.879] TICK #267  avail=6  bytes=1398  ON=0  ps=0  pi=0
+  RAW[6]: 2B 00 E4 51 01 00 
+[22:48:30.924] TICK #269  avail=5  bytes=1404  ON=0  ps=0  pi=0
+  RAW[5]: 54 23 00 00 A0 
+[22:48:30.946] TICK #270  avail=6  bytes=1409  ON=0  ps=0  pi=0
+  RAW[6]: 40 00 00 F0 01 E0 
+[22:48:30.989] TICK #272  avail=5  bytes=1415  ON=0  ps=0  pi=0
+  RAW[5]: 62 00 7C 01 00 
+[22:48:31.010] TICK #273  avail=3  bytes=1420  ON=0  ps=0  pi=0
+  RAW[3]: A4 05 FA 
+[22:48:31.054] TICK #275  avail=8  bytes=1423  ON=0  ps=0  pi=0
+  RAW[8]: 09 00 A0 53 20 00 C8 FE 
+[22:48:31.076] TICK #276  avail=5  bytes=1431  ON=0  ps=0  pi=0
+  RAW[5]: 19 00 A2 09 00 
+[22:48:31.119] TICK #278  avail=4  bytes=1436  ON=0  ps=0  pi=0
+  RAW[4]: A0 11 00 A8 
+[22:48:31.161] TICK #280  avail=7  bytes=1440  ON=0  ps=0  pi=0
+  RAW[7]: 02 00 20 FF 67 01 64 
+[22:48:31.182] TICK #281  avail=5  bytes=1447  ON=0  ps=0  pi=0
+  RAW[5]: 2E 00 E0 26 00 
+[22:48:31.223] TICK #283  avail=5  bytes=1452  ON=0  ps=0  pi=0
+  RAW[5]: F4 45 00 80 FF 
+[22:48:31.245] TICK #284  avail=6  bytes=1457  ON=0  ps=0  pi=0
+  RAW[6]: 0B 00 A0 65 00 A2 
+[22:48:31.287] TICK #286  avail=4  bytes=1463  ON=0  ps=0  pi=0
+  RAW[4]: 20 00 47 00 
+[22:48:31.331] TICK #288  avail=6  bytes=1467  ON=0  ps=0  pi=0
+  RAW[6]: A0 6C 01 A5 00 D9 
+[22:48:31.354] TICK #289  avail=10  bytes=1473  ON=0  ps=0  pi=0
+  RAW[10]: 7F 09 00 08 FC D7 00 20 00 CC 
+[22:48:31.397] TICK #291  avail=6  bytes=1483  ON=0  ps=0  pi=0
+  RAW[6]: 7F 02 00 FC 13 01 
+[22:48:31.418] TICK #292  avail=4  bytes=1489  ON=0  ps=0  pi=0
+  RAW[4]: 20 02 00 A0 
+[22:48:31.461] TICK #294  avail=6  bytes=1493  ON=0  ps=0  pi=0
+  RAW[6]: 5F 01 EC 41 00 F0 
+[22:48:31.483] TICK #295  avail=5  bytes=1499  ON=0  ps=0  pi=0
+  RAW[5]: 1A 00 A8 02 00 
+[22:48:31.526] TICK #297  avail=6  bytes=1504  ON=0  ps=0  pi=0
+  RAW[6]: AA 13 00 ED 6F 40 
+[22:48:31.547] TICK #298  avail=4  bytes=1510  ON=0  ps=0  pi=0
+  RAW[4]: EA 09 00 EA 
+[22:48:31.590] TICK #300  avail=5  bytes=1514  ON=0  ps=0  pi=0
+  RAW[5]: 02 00 DC 05 00 
+[22:48:31.633] TICK #302  avail=7  bytes=1519  ON=0  ps=0  pi=0
+  RAW[7]: D8 01 00 A0 FF DF 01 
+[22:48:31.656] TICK #303  avail=4  bytes=1526  ON=0  ps=0  pi=0
+  RAW[4]: E2 17 00 EC 
+[22:48:31.698] TICK #305  avail=6  bytes=1530  ON=0  ps=0  pi=0
+  RAW[6]: 1B 00 20 FF 5F 04 
+[22:48:31.721] TICK #306  avail=7  bytes=1536  ON=0  ps=0  pi=0
+  RAW[7]: 40 01 00 A0 FD 41 00 
+[22:48:31.762] TICK #308  avail=4  bytes=1543  ON=0  ps=0  pi=0
+  RAW[4]: EA 59 00 AA 
+[22:48:31.783] TICK #309  avail=6  bytes=1547  ON=0  ps=0  pi=0
+  RAW[6]: 02 00 EC 67 00 A8 
+[22:48:31.826] TICK #311  avail=5  bytes=1553  ON=0  ps=0  pi=0
+  RAW[5]: 01 00 F0 1B 08 
+[22:48:31.868] TICK #313  avail=5  bytes=1558  ON=0  ps=0  pi=0
+  RAW[5]: 84 FF 01 01 BE 
+[22:48:31.891] TICK #314  avail=7  bytes=1563  ON=0  ps=0  pi=0
+  RAW[7]: 0B 00 E0 FF A7 01 F8 
+[22:48:31.933] TICK #316  avail=6  bytes=1570  ON=0  ps=0  pi=0
+  RAW[6]: 97 20 00 FC 26 00 
+[22:48:31.955] TICK #317  avail=4  bytes=1576  ON=0  ps=0  pi=0
+  RAW[4]: DC 03 00 34 
+[22:48:31.997] TICK #319  avail=6  bytes=1580  ON=0  ps=0  pi=0
+  RAW[6]: 81 00 A0 73 00 D4 
+[22:48:32.018] TICK #320  avail=5  bytes=1586  ON=0  ps=0  pi=0
+  RAW[5]: 05 00 E8 2A 00 
+[22:48:32.061] TICK #322  avail=4  bytes=1591  ON=0  ps=0  pi=0
+  RAW[4]: E8 9B 02 EC 
+[22:48:32.083] TICK #323  avail=7  bytes=1595  ON=0  ps=0  pi=0
+  RAW[7]: 0B 00 A0 7B 12 00 A0 
+[22:48:32.125] TICK #325  avail=5  bytes=1602  ON=0  ps=0  pi=0
+  RAW[5]: A7 01 E6 86 01 
+[22:48:32.167] TICK #327  avail=4  bytes=1607  ON=0  ps=0  pi=0
+  RAW[4]: B0 45 00 D0 
+[22:48:32.190] TICK #328  avail=7  bytes=1611  ON=0  ps=0  pi=0
+  RAW[7]: 53 04 00 E4 11 00 F0 
+[22:48:32.197] PGA cmd enviado: 32x (code 0x06) — esperando confirmación...
+[22:48:32.260] PGA: error leyendo confirmación — Dimensions of arrays being concatenated are not consistent.
+[22:48:32.261] PGA WARN: sin confirmación del PSoC — verifica la conexión
+[22:48:32.305] TICK #331  avail=6  bytes=1618  ON=0  ps=0  pi=0
+  RAW[6]: 02 00 E8 92 00 A0 
+[22:48:32.326] TICK #332  avail=5  bytes=1624  ON=0  ps=0  pi=0
+  RAW[5]: CA 0A 50 0B 00 
+[22:48:32.369] TICK #334  avail=4  bytes=1629  ON=0  ps=0  pi=0
+  RAW[4]: E8 55 00 A0 
+[22:48:32.388] PGA cmd enviado: 32x (code 0x06) — esperando confirmación...
+[22:48:32.493] PGA: error leyendo confirmación — Dimensions of arrays being concatenated are not consistent.
+[22:48:32.493] PGA WARN: sin confirmación del PSoC — verifica la conexión
+[22:48:32.537] TICK #337  avail=5  bytes=1633  ON=0  ps=0  pi=0
+  RAW[5]: 53 02 F4 05 00 
+[22:48:32.558] TICK #338  avail=4  bytes=1638  ON=0  ps=0  pi=0
+  RAW[4]: E0 15 00 E4 
+[22:48:32.577] PGA cmd enviado: 32x (code 0x06) — esperando confirmación...
+[22:48:32.620] PGA: error leyendo confirmación — Dimensions of arrays being concatenated are not consistent.
+[22:48:32.621] PGA WARN: sin confirmación del PSoC — verifica la conexión
+[22:48:32.664] TICK #341  avail=4  bytes=1642  ON=0  ps=0  pi=0
+  RAW[4]: D0 6E 03 E0 
+[22:48:32.685] TICK #342  avail=6  bytes=1646  ON=0  ps=0  pi=0
+  RAW[6]: 55 08 FC 27 01 F8 
+[22:48:32.728] TICK #344  avail=5  bytes=1652  ON=0  ps=0  pi=0
+  RAW[5]: 4B 00 E0 A7 00 
+[22:48:32.770] TICK #346  avail=4  bytes=1657  ON=0  ps=0  pi=0
+  RAW[4]: E8 04 00 A0 
+[22:48:32.793] TICK #347  avail=6  bytes=1661  ON=0  ps=0  pi=0
+  RAW[6]: 0B 00 D4 BF 00 FE 
+[22:48:32.836] TICK #349  avail=5  bytes=1667  ON=0  ps=0  pi=0
+  RAW[5]: 14 00 F8 0B 00 
+[22:48:32.857] TICK #350  avail=4  bytes=1672  ON=0  ps=0  pi=0
+  RAW[4]: E0 15 00 7C 
+[22:48:32.899] TICK #352  avail=6  bytes=1676  ON=0  ps=0  pi=0
+  RAW[6]: 7F 00 FA AF 00 EA 
+[22:48:32.921] TICK #353  avail=6  bytes=1682  ON=0  ps=0  pi=0
+  RAW[6]: 7B 02 00 EA 0B 00 
+[22:48:32.964] TICK #355  avail=7  bytes=1688  ON=0  ps=0  pi=0
+  RAW[7]: C7 45 00 F2 5B 00 00 
+[22:48:33.006] TICK #357  avail=5  bytes=1695  ON=0  ps=0  pi=0
+  RAW[5]: A8 FF 65 41 A8 
+[22:48:33.029] TICK #358  avail=5  bytes=1700  ON=0  ps=0  pi=0
+  RAW[5]: 2D 00 68 8A 00 
+[22:48:33.071] TICK #360  avail=7  bytes=1705  ON=0  ps=0  pi=0
+  RAW[7]: AA 55 00 00 E8 39 08 
+[22:48:33.092] TICK #361  avail=5  bytes=1712  ON=0  ps=0  pi=0
+  RAW[5]: CC 4D 08 00 D4 
+[22:48:33.134] TICK #363  avail=6  bytes=1717  ON=0  ps=0  pi=0
+  RAW[6]: FB 01 E8 45 00 E0 
+[22:48:33.157] TICK #364  avail=7  bytes=1723  ON=0  ps=0  pi=0
+  RAW[7]: 5B 00 00 F9 46 00 21 
+[22:48:33.200] TICK #366  avail=5  bytes=1730  ON=0  ps=0  pi=0
+  RAW[5]: E0 0F 00 00 6C 
+[22:48:33.223] TICK #367  avail=8  bytes=1735  ON=0  ps=0  pi=0
+  RAW[8]: 4F 00 00 00 A4 01 00 F2 
+[22:48:33.269] TICK #368  avail=10  bytes=1743  ON=0  ps=0  pi=0
+  RAW[10]: DB 92 00 00 E0 FF 11 00 00 00 
+[22:48:33.316] TICK #369  avail=5  bytes=1753  ON=0  ps=0  pi=0
+  RAW[5]: E4 89 08 00 C4 
+[22:48:33.361] TICK #370  avail=19  bytes=1758  ON=0  ps=0  pi=0
+  RAW[19]: 1F 00 00 78 00 04 00 00 54 FF 53 10 00 00 EA DE 10 00 00 
+[22:48:33.409] TICK #371  avail=7  bytes=1777  ON=0  ps=0  pi=0
+  RAW[7]: C8 6F 02 24 09 00 E0 
+[22:48:33.429] TICK #372  avail=11  bytes=1784  ON=0  ps=0  pi=0
+  RAW[11]: 5B 5B 04 04 00 F8 45 08 0B 00 C4 
+[22:48:33.471] TICK #374  avail=9  bytes=1795  ON=0  ps=0  pi=0
+  RAW[9]: 5B 02 49 00 A8 FD 27 48 00 
+[22:48:33.494] TICK #375  avail=5  bytes=1804  ON=0  ps=0  pi=0
+  RAW[5]: E0 57 95 04 40 
+[22:48:33.536] TICK #377  avail=10  bytes=1809  ON=0  ps=0  pi=0
+  RAW[10]: BF 7F 00 00 00 73 28 09 00 AA 
+[22:48:33.559] TICK #378  avail=9  bytes=1819  ON=0  ps=0  pi=0
+  RAW[9]: 5B 0B 08 80 FE 4F 5A 01 00 
+[22:48:33.601] TICK #380  avail=7  bytes=1828  ON=0  ps=0  pi=0
+  RAW[7]: 80 FF 49 D0 01 00 A2 
+[22:48:33.622] TICK #381  avail=11  bytes=1835  ON=0  ps=0  pi=0
+  RAW[11]: 53 09 00 00 50 7F 09 00 00 80 FE 
+[22:48:33.665] TICK #383  avail=9  bytes=1846  ON=0  ps=0  pi=0
+  RAW[9]: 59 09 00 00 E0 DB 00 00 00 
+[22:48:33.709] TICK #385  avail=8  bytes=1855  ON=0  ps=0  pi=0
+  RAW[8]: 60 77 4A 20 00 00 00 50 
+[22:48:33.730] TICK #386  avail=10  bytes=1863  ON=0  ps=0  pi=0
+  RAW[10]: 49 49 41 F8 5B 20 40 00 C0 FF 
+[22:48:33.773] TICK #388  avail=8  bytes=1873  ON=0  ps=0  pi=0
+  RAW[8]: FF 81 01 08 99 09 01 09 
+[22:48:33.794] TICK #389  avail=7  bytes=1881  ON=0  ps=0  pi=0
+  RAW[7]: D0 FF 82 00 0A C4 FF 
+[22:48:33.835] TICK #391  avail=12  bytes=1888  ON=0  ps=0  pi=0
+  RAW[12]: 4B 09 41 00 00 A2 45 0C 49 00 00 F0 
+[22:48:33.857] TICK #392  avail=10  bytes=1900  ON=0  ps=0  pi=0
+  RAW[10]: 4B 40 09 00 C0 57 00 29 00 00 
+[22:48:33.899] TICK #394  avail=5  bytes=1910  ON=0  ps=0  pi=0
+  RAW[5]: A0 0A 25 01 D8 
+[22:48:33.942] TICK #396  avail=11  bytes=1915  ON=0  ps=0  pi=0
+  RAW[11]: 5B 25 09 00 F8 F7 69 00 08 A8 F7 
+[22:48:33.963] TICK #397  avail=8  bytes=1926  ON=0  ps=0  pi=0
+  RAW[8]: 5B 41 08 D1 09 48 00 00 
+[22:48:34.007] TICK #399  avail=5  bytes=1934  ON=0  ps=0  pi=0
+  RAW[5]: 68 4B 04 05 55 
+[22:48:34.028] TICK #400  avail=10  bytes=1939  ON=0  ps=0  pi=0
+  RAW[10]: 6B 00 00 00 CC FF 69 41 00 E8 
+[22:48:34.071] TICK #402  avail=9  bytes=1949  ON=0  ps=0  pi=0
+  RAW[9]: 4B 01 00 00 A2 4F 09 00 00 
+[22:48:34.094] TICK #403  avail=7  bytes=1958  ON=0  ps=0  pi=0
+  RAW[7]: 50 FF 49 04 00 10 EE 
+[22:48:34.135] TICK #405  avail=10  bytes=1965  ON=0  ps=0  pi=0
+  RAW[10]: 11 00 00 40 FB 4F 00 00 C0 FF 
+[22:48:34.156] TICK #406  avail=7  bytes=1975  ON=0  ps=0  pi=0
+  RAW[7]: 4B 00 6C FF B6 09 00 
+[22:48:34.198] TICK #408  avail=5  bytes=1982  ON=0  ps=0  pi=0
+  RAW[5]: B2 0B 01 A8 DA 
+[22:48:34.240] TICK #410  avail=9  bytes=1987  ON=0  ps=0  pi=0
+  RAW[9]: 08 00 80 FF 97 01 00 8D FF 
+[22:48:34.261] TICK #411  avail=8  bytes=1996  ON=0  ps=0  pi=0
+  RAW[8]: 37 09 00 00 FB 41 01 00 
+[22:48:34.305] TICK #413  avail=6  bytes=2004  ON=0  ps=0  pi=0
+  RAW[6]: B0 FF 16 00 00 A0 
+[22:48:34.327] TICK #414  avail=9  bytes=2010  ON=0  ps=0  pi=0
+  RAW[9]: 55 01 00 A0 FF 05 00 00 EB 
+[22:48:34.369] TICK #416  avail=7  bytes=2019  ON=0  ps=0  pi=0
+  RAW[7]: 3D 00 60 F5 5F 04 00 
+[22:48:34.392] TICK #417  avail=6  bytes=2026  ON=0  ps=0  pi=0
+  RAW[6]: 80 FF 5F 00 C0 FF 
+[22:48:34.434] TICK #419  avail=8  bytes=2032  ON=0  ps=0  pi=0
+  RAW[8]: 03 00 00 11 08 00 80 FF 
+[22:48:34.477] TICK #421  avail=6  bytes=2040  ON=0  ps=0  pi=0
+  RAW[6]: DF 00 80 EF 27 00 
+[22:48:34.497] TICK #422  avail=5  bytes=2046  ON=0  ps=0  pi=0
+  RAW[5]: 20 FF 02 60 FF 
+[22:48:34.541] TICK #424  avail=8  bytes=2051  ON=0  ps=0  pi=0
+  RAW[8]: 57 00 C0 FF DF 00 CC FF 
+[22:48:34.562] TICK #425  avail=4  bytes=2059  ON=0  ps=0  pi=0
+  RAW[4]: 05 E8 3E 00 
+[22:48:34.602] TICK #427  avail=6  bytes=2063  ON=0  ps=0  pi=0
+  RAW[6]: E0 FF FB 02 00 A1 
+[22:48:34.625] TICK #428  avail=9  bytes=2069  ON=0  ps=0  pi=0
+  RAW[9]: 01 00 00 A8 FE 1F 00 A0 FF 
+[22:48:34.667] TICK #430  avail=5  bytes=2078  ON=0  ps=0  pi=0
+  RAW[5]: 28 00 F1 D3 00 
+[22:48:34.709] TICK #432  avail=5  bytes=2083  ON=0  ps=0  pi=0
+  RAW[5]: A0 FF 29 00 EB 
+[22:48:34.730] TICK #433  avail=6  bytes=2088  ON=0  ps=0  pi=0
+  RAW[6]: 63 00 8A B6 00 A0 
+[22:48:34.771] TICK #435  avail=4  bytes=2094  ON=0  ps=0  pi=0
+  RAW[4]: 67 00 C4 9B 
+[22:48:34.792] TICK #436  avail=5  bytes=2098  ON=0  ps=0  pi=0
+  RAW[5]: 68 0B 00 F4 FF 
+[22:48:34.834] TICK #438  avail=7  bytes=2103  ON=0  ps=0  pi=0
+  RAW[7]: CF 41 DC FE 2D 00 48 
+[22:48:34.876] TICK #440  avail=5  bytes=2110  ON=0  ps=0  pi=0
+  RAW[5]: 0B 00 CC 02 00 
+[22:48:34.898] TICK #441  avail=6  bytes=2115  ON=0  ps=0  pi=0
+  RAW[6]: A8 FD 35 00 DC FF 
+[22:48:34.941] TICK #443  avail=7  bytes=2121  ON=0  ps=0  pi=0
+  RAW[7]: 51 00 80 FF 53 00 FC 
+[22:48:34.963] TICK #444  avail=4  bytes=2128  ON=0  ps=0  pi=0
+  RAW[4]: 03 CC 5F 00 
+[22:48:35.007] TICK #446  avail=5  bytes=2132  ON=0  ps=0  pi=0
+  RAW[5]: E0 7B 00 70 FD 
+[22:48:35.028] TICK #447  avail=4  bytes=2137  ON=0  ps=0  pi=0
+  RAW[4]: 03 E8 00 5A 
+[22:48:35.070] TICK #449  avail=5  bytes=2141  ON=0  ps=0  pi=0
+  RAW[5]: 11 00 A0 FF 01 
+[22:48:35.093] TICK #450  avail=4  bytes=2146  ON=0  ps=0  pi=0
+  RAW[4]: 60 FF 0B 40 
+[22:48:35.136] TICK #452  avail=6  bytes=2150  ON=0  ps=0  pi=0
+  RAW[6]: 81 80 FF 00 80 FF 
+[22:48:35.179] TICK #454  avail=6  bytes=2156  ON=0  ps=0  pi=0
+  RAW[6]: 02 00 AC FE 6F 00 
+[22:48:35.200] TICK #455  avail=4  bytes=2162  ON=0  ps=0  pi=0
+  RAW[4]: A0 00 00 FF 
+[22:48:35.242] TICK #457  avail=7  bytes=2166  ON=0  ps=0  pi=0
+  RAW[7]: 19 00 68 FF 09 20 FF 
+[22:48:35.263] TICK #458  avail=4  bytes=2173  ON=0  ps=0  pi=0
+  RAW[4]: 2B 00 EA 06 
+[22:48:35.306] TICK #460  avail=5  bytes=2177  ON=0  ps=0  pi=0
+  RAW[5]: E0 63 00 A0 FF 
+[22:48:35.328] TICK #461  avail=6  bytes=2182  ON=0  ps=0  pi=0
+  RAW[6]: 4B 00 CC 46 00 76 
+[22:48:35.369] TICK #463  avail=6  bytes=2188  ON=0  ps=0  pi=0
+  RAW[6]: 0F 02 F9 6F 56 00 
+[22:48:35.412] TICK #465  avail=4  bytes=2194  ON=0  ps=1  pi=2
+  RAW[4]: FF 45 00 F8 
+  PARSED: 1
+[22:48:35.435] TICK #466  avail=7  bytes=2198  ON=0  ps=0  pi=5
+  RAW[7]: 5B 2B EA 53 1B 00 60 
+[22:48:35.477] TICK #468  avail=6  bytes=2205  ON=0  ps=0  pi=5
+  RAW[6]: 8D 01 B0 33 52 00 
+[22:48:35.500] TICK #469  avail=5  bytes=2211  ON=0  ps=0  pi=5
+  RAW[5]: 90 AF 09 00 A0 
+[22:48:35.542] TICK #471  avail=6  bytes=2216  ON=0  ps=0  pi=5
+  RAW[6]: 87 00 F8 02 00 D8 
+[22:48:35.563] TICK #472  avail=5  bytes=2222  ON=0  ps=0  pi=5
+  RAW[5]: 53 10 E8 27 00 
+[22:48:35.607] TICK #474  avail=4  bytes=2227  ON=0  ps=0  pi=5
+  RAW[4]: F4 7F 20 DA 
+[22:48:35.628] TICK #475  avail=6  bytes=2231  ON=0  ps=0  pi=5
+  RAW[6]: 04 00 AC 01 00 E8 
+[22:48:35.670] TICK #477  avail=5  bytes=2237  ON=0  ps=0  pi=5
+  RAW[5]: A6 04 A0 11 08 
+[22:48:35.693] TICK #478  avail=4  bytes=2242  ON=0  ps=0  pi=5
+  RAW[4]: EC 43 01 80 
+[22:48:35.734] TICK #480  avail=6  bytes=2246  ON=0  ps=0  pi=5
+  RAW[6]: 07 00 40 12 00 FE 
+[22:48:35.776] TICK #482  avail=5  bytes=2252  ON=0  ps=0  pi=5
+  RAW[5]: 02 00 F0 0B 00 
+[22:48:35.798] TICK #483  avail=4  bytes=2257  ON=0  ps=0  pi=5
+  RAW[4]: EC 0B 00 E8 
+[22:48:35.839] TICK #485  avail=7  bytes=2261  ON=0  ps=0  pi=5
+  RAW[7]: FF 0B 00 E9 FD 21 EC 
+[22:48:35.861] TICK #486  avail=6  bytes=2268  ON=0  ps=0  pi=5
+  RAW[6]: 7F 02 CA DB 03 A0 
+[22:48:35.902] TICK #488  avail=7  bytes=2274  ON=0  ps=0  pi=5
+  RAW[7]: FF 7D 01 60 FF DF 00 
+[22:48:35.944] TICK #490  avail=6  bytes=2281  ON=0  ps=0  pi=5
+  RAW[6]: 64 FF 5F 00 40 FD 
+[22:48:35.966] TICK #491  avail=8  bytes=2287  ON=0  ps=0  pi=5
+  RAW[8]: F5 00 00 AC FF 0B 03 00 
+[22:48:36.009] TICK #493  avail=8  bytes=2295  ON=0  ps=0  pi=5
+  RAW[8]: 00 F9 65 00 E8 FE 91 03 
+[22:48:36.030] TICK #494  avail=9  bytes=2303  ON=0  ps=0  pi=5
+  RAW[9]: A4 FF 02 00 20 4B 4B EB 5F 
+[22:48:36.074] TICK #496  avail=9  bytes=2312  ON=0  ps=0  pi=5
+  RAW[9]: 33 00 68 DB B1 00 25 4B FB 
+[22:48:36.095] TICK #497  avail=10  bytes=2321  ON=0  ps=0  pi=5
+  RAW[10]: EE 05 02 00 49 FB 75 EA 07 00 
+[22:48:36.139] TICK #499  avail=11  bytes=2331  ON=0  ps=0  pi=5
+  RAW[11]: 28 5B DB AF 85 8B 00 00 00 21 49 
+[22:48:36.162] TICK #500  avail=5  bytes=2342  ON=0  ps=0  pi=5
+  RAW[5]: 43 00 41 DB 07 
+[22:48:36.204] TICK #502  avail=6  bytes=2347  ON=0  ps=0  pi=5
+  RAW[6]: C0 19 60 FF 47 00 
+[22:48:36.246] TICK #504  avail=7  bytes=2353  ON=0  ps=0  pi=5
+  RAW[7]: CC FF 4D 05 00 54 FF 
+[22:48:36.267] TICK #505  avail=6  bytes=2360  ON=0  ps=0  pi=5
+  RAW[6]: 41 01 2E AD 03 00 
+[22:48:36.309] TICK #507  avail=6  bytes=2366  ON=0  ps=0  pi=5
+  RAW[6]: 30 FF F7 00 A0 05 
+[22:48:36.332] TICK #508  avail=4  bytes=2372  ON=0  ps=0  pi=5
+  RAW[4]: 40 FF 01 A0 
+[22:48:36.375] TICK #510  avail=4  bytes=2376  ON=0  ps=0  pi=5
+  RAW[4]: 03 FA F1 01 
+[22:48:36.396] TICK #511  avail=10  bytes=2380  ON=0  ps=0  pi=5
+  RAW[10]: E8 FB 02 20 4B FB FF 01 10 00 
+[22:48:36.463] TICK #513  avail=71  bytes=2390  ON=0  ps=0  pi=5
+  RAW[71]: 00 20 49 4A 4B 5B DB 83 00 00 00 21 49 49 5B 4B 5B 6B D6 FF FF 15 80 9D 00 02 04 00 00 00 00 49 49 49 4B 6B 5B 4B DB F7 ...
+[22:48:36.508] TICK #514  avail=82  bytes=2461  ON=0  ps=0  pi=5
+  RAW[82]: FF FB 6B 53 BD 6B 2C 2D 4B 49 6B 6B 69 6B 49 49 69 6B 4B 29 68 69 29 09 24 29 21 29 69 69 29 08 69 68 68 49 28 6B 6B 69 ...
+[22:48:36.554] TICK #515  avail=41  bytes=2543  ON=0  ps=0  pi=5
+  RAW[41]: 6B 6B EB FB 5B CB 7B FB DB FF FB 5F 0B AC 4F 5A 49 6B DB FB 5B FB 4B FF DB 7B 7B 4B EB 5B 4B DF CB 7F 4B CB FB EB EF FB ...
+[22:48:36.581] TICK #516  avail=98  bytes=2584  ON=0  ps=0  pi=5
+  RAW[98]: EF 5B FF 57 75 9D 35 08 00 00 20 4A 25 49 04 69 25 29 01 24 09 09 21 00 00 00 21 00 08 00 01 00 04 08 20 80 B4 28 69 69 ...
+[22:48:36.602] TICK #517  avail=27  bytes=2682  ON=0  ps=0  pi=5
+  RAW[27]: FB F9 27 00 00 00 00 00 68 08 24 69 48 6B 69 6B 4B 6B 6F 6B 5F 6B 7F FF EF 09 00 
+[22:48:36.647] TICK #519  avail=15  bytes=2709  ON=0  ps=0  pi=5
+  RAW[15]: 00 6D 5A 4B 4B 5B DB DB 00 00 08 DB DB DB DF 
+[22:48:36.669] TICK #520  avail=24  bytes=2724  ON=0  ps=0  pi=5
+  RAW[24]: FB 02 00 49 25 01 00 09 28 49 5B 4A 5B DB 5B 4B 00 04 48 2D 49 4B 5B FB 
+[22:48:36.712] TICK #522  avail=16  bytes=2748  ON=0  ps=0  pi=5
+  RAW[16]: FF 5B 02 00 00 20 69 4B 4B 5B 4B 4B FF 65 04 00 
+[22:48:36.733] TICK #523  avail=26  bytes=2764  ON=0  ps=0  pi=5
+  RAW[26]: 00 01 49 49 DB DB 5B FF F7 01 00 00 00 00 00 40 08 05 4A 2D 49 5B DB 5B DB DF 
+[22:48:36.775] TICK #525  avail=33  bytes=2790  ON=0  ps=0  pi=5
+  RAW[33]: FF DF 4B 00 00 00 00 24 21 89 2D 49 5B FB DB FF FF FF 8F 89 00 00 00 A0 4B 4B 4B 4B 5B 4B 5B FB FF 
+[22:48:36.818] TICK #527  avail=22  bytes=2823  ON=0  ps=0  pi=5
+  RAW[22]: DF DB 0B 40 00 00 49 4B 4B 5B DB FF DB 0B BA F7 0D 00 00 0B 00 00 
+[22:48:36.839] TICK #528  avail=180  bytes=2845  ON=0  ps=0  pi=5
+  RAW[180]: 56 02 12 05 DC 56 03 00 18 00 56 04 94 94 00 56 05 07 D0 01 56 06 94 94 00 56 00 06 7F D6 56 00 04 C1 84 56 00 06 2D 46 ...
+  PARSED: 31
+[22:48:36.870] TICK #529  avail=242  bytes=3025  ON=0  ps=0  pi=5
+  RAW[242]: 56 00 02 F6 C4 56 00 03 62 D8 56 00 06 60 9D 56 00 0B 6D 77 56 00 0B 6B D6 56 00 0A FC 4C 56 00 0A 51 BF 56 00 0A 65 6B ...
+  PARSED: 48
+[22:48:36.914] TICK #531  avail=248  bytes=3267  ON=0  ps=1  pi=2
+  RAW[248]: 07 19 A1 56 00 07 50 7C 56 00 07 23 D2 56 00 06 77 AE 56 00 06 41 EF 56 00 06 29 88 56 00 05 A4 90 56 00 05 10 EC 56 00 ...
+  PARSED: 50
+[22:48:36.937] TICK #532  avail=242  bytes=3515  ON=0  ps=0  pi=5
+  RAW[242]: 56 00 04 08 51 56 00 03 CD 95 56 00 01 59 B4 56 00 00 FE FC 56 00 00 F9 84 56 00 00 F8 DC 56 00 02 9E 6F 56 00 04 81 58 ...
+  PARSED: 48
+[22:48:36.982] TICK #534  avail=246  bytes=3757  ON=0  ps=1  pi=2
+  RAW[246]: 00 F1 FC 56 00 00 FF B7 56 00 03 0E D2 56 00 04 06 5B 56 00 03 DE 6A 56 00 04 1D 25 56 00 04 2A 88 56 00 04 3C 74 56 00 ...
+  PARSED: 49
+[22:48:37.005] TICK #535  avail=243  bytes=4003  ON=0  ps=1  pi=3
+  RAW[243]: F3 A2 56 00 03 E6 CC 56 00 03 B1 12 56 00 03 EA 72 56 00 03 61 27 56 00 02 F1 92 56 00 02 46 BC 56 00 01 12 09 56 00 00 ...
+  PARSED: 49
+[22:48:37.049] TICK #537  avail=244  bytes=4246  ON=0  ps=1  pi=1
+  RAW[244]: 00 02 9A D1 56 00 01 9C 40 56 00 00 FB DF 56 00 00 F4 4A 56 00 00 F1 7C 56 00 01 81 49 56 00 02 CC 5B 56 00 03 51 E9 56 ...
+  PARSED: 49
+[22:48:37.072] TICK #538  avail=246  bytes=4490  ON=0  ps=0  pi=5
+  RAW[246]: 56 00 02 6C 41 56 00 03 35 F5 56 00 03 67 76 56 00 03 89 4C 56 00 03 7A E4 56 00 03 A7 8F 56 00 03 CC 19 56 00 03 76 BF ...
+  PARSED: 49
+[22:48:37.117] TICK #540  avail=244  bytes=4736  ON=0  ps=1  pi=1
+  RAW[244]: 00 03 97 96 56 00 03 69 B1 56 00 03 3D E5 56 00 02 A6 A0 56 00 02 67 44 56 00 01 1B EA 56 00 00 F2 25 56 00 00 F0 1A 56 ...
+  PARSED: 49
+[22:48:37.138] TICK #541  avail=244  bytes=4980  ON=0  ps=0  pi=5
+  RAW[244]: 56 00 01 00 F2 56 00 00 EE 56 56 00 00 EE 29 56 00 01 04 85 56 00 02 B0 DA 56 00 03 33 FE 56 00 03 27 0D 56 00 03 5F C5 ...
+  PARSED: 48
+[22:48:37.182] TICK #543  avail=241  bytes=5224  ON=0  ps=1  pi=4
+  RAW[241]: A9 56 00 03 23 81 56 00 03 13 FA 56 00 03 59 F5 56 00 03 7D F6 56 00 03 B2 48 56 00 03 89 8A 56 00 02 DD DF 56 00 02 B0 ...
+  PARSED: 49
+[22:48:37.205] TICK #544  avail=248  bytes=5465  ON=0  ps=0  pi=5
+  RAW[248]: 56 00 03 49 D7 56 00 03 47 1E 56 00 02 A7 BF 56 00 02 6E 65 56 00 01 61 2E 56 00 00 EF A4 56 00 00 EB 1B 56 00 00 E9 E9 ...
+  PARSED: 49
+[22:48:37.249] TICK #546  avail=244  bytes=5713  ON=0  ps=1  pi=3
+  RAW[244]: E9 3F 56 00 00 E8 EF 56 00 00 EA 44 56 00 02 00 BB 56 00 03 13 89 56 00 03 38 34 56 00 03 78 1F 56 00 03 72 B6 56 00 03 ...
+  PARSED: 49
+[22:48:37.271] TICK #547  avail=243  bytes=5957  ON=0  ps=1  pi=2
+  RAW[243]: 03 2B 49 56 00 03 73 71 56 00 03 67 C1 56 00 03 38 1A 56 00 03 18 12 56 00 02 BA 43 56 00 02 95 4C 56 00 02 49 49 56 00 ...
+  PARSED: 49
+[22:48:37.315] TICK #549  avail=245  bytes=6200  ON=0  ps=0  pi=5
+  RAW[245]: 56 00 02 F7 CA 56 00 02 79 65 56 00 01 B0 76 56 00 00 F1 1C 56 00 00 E4 6A 56 00 00 E7 5A 56 00 00 EF C3 56 00 02 7C CE ...
+  PARSED: 49
+[22:48:37.337] TICK #550  avail=243  bytes=6445  ON=0  ps=0  pi=5
+  RAW[243]: 56 00 00 E0 EB 56 00 01 6F 62 56 00 02 ED AD 56 00 03 15 A9 56 00 03 2C BF 56 00 03 39 41 56 00 03 80 4B 56 00 03 3E 13 ...
+  PARSED: 48
+[22:48:37.380] TICK #552  avail=242  bytes=6688  ON=0  ps=1  pi=3
+  RAW[242]: 1A 24 56 00 03 71 75 56 00 03 6A 49 56 00 03 67 A5 56 00 02 E3 EC 56 00 02 42 7B 56 00 02 42 72 56 00 01 58 A4 56 00 00 ...
+  PARSED: 49
+[22:48:37.403] TICK #553  avail=245  bytes=6930  ON=0  ps=0  pi=5
+  RAW[245]: 56 00 02 7F 6F 56 00 02 37 36 56 00 01 07 78 56 00 00 E1 3A 56 00 00 E2 EB 56 00 00 E5 91 56 00 01 EF BE 56 00 02 E3 4A ...
+  PARSED: 49
+[22:48:37.447] TICK #555  avail=242  bytes=7175  ON=0  ps=0  pi=5
+  RAW[242]: 56 00 01 07 AE 56 00 02 C1 D3 56 00 03 19 4F 56 00 03 37 76 56 00 03 29 A4 56 00 03 5D 78 56 00 03 51 B6 56 00 02 CD B3 ...
+  PARSED: 48
+[22:48:37.471] TICK #556  avail=243  bytes=7417  ON=0  ps=1  pi=2
+  RAW[243]: 03 38 34 56 00 03 5A BD 56 00 03 48 10 56 00 03 23 A5 56 00 02 C0 E7 56 00 02 86 67 56 00 01 DF C2 56 00 00 EE B2 56 00 ...
+  PARSED: 49
+[22:48:37.514] TICK #558  avail=245  bytes=7660  ON=0  ps=0  pi=5
+  RAW[245]: 56 00 02 6D 7E 56 00 01 15 6A 56 00 00 DF 54 56 00 00 DB 9D 56 00 00 DC 8D 56 00 01 42 9B 56 00 02 CE 70 56 00 02 EE 6B ...
+  PARSED: 49
+[22:48:37.538] TICK #559  avail=240  bytes=7905  ON=0  ps=0  pi=5
+  RAW[240]: 56 00 02 0D 5F 56 00 02 EA DA 56 00 03 1E 2B 56 00 03 46 C1 56 00 03 42 0D 56 00 03 0B 47 56 00 03 07 DA 56 00 02 F1 10 ...
+  PARSED: 48
+[22:48:37.582] TICK #561  avail=243  bytes=8145  ON=0  ps=0  pi=5
+  RAW[243]: 56 00 03 18 32 56 00 03 22 65 56 00 03 35 2B 56 00 02 BF 07 56 00 02 55 1B 56 00 02 23 B6 56 00 00 F6 05 56 00 00 D9 B7 ...
+  PARSED: 48
+[22:48:37.604] TICK #562  avail=240  bytes=8388  ON=0  ps=1  pi=3
+  RAW[240]: 58 95 56 00 01 B0 63 56 00 00 E3 2D 56 00 00 DA 1A 56 00 00 DE 7C 56 00 01 24 0B 56 00 02 DC 06 56 00 03 2B 17 56 00 03 ...
+  PARSED: 48
+[22:48:37.648] TICK #564  avail=242  bytes=8628  ON=0  ps=1  pi=3
+  RAW[242]: D6 F2 56 00 01 9A 7C 56 00 03 3A 13 56 00 03 64 CE 56 00 03 72 62 56 00 03 3C 3D 56 00 02 ED 83 56 00 02 E7 BC 56 00 02 ...
+  PARSED: 49
+[22:48:37.670] TICK #565  avail=245  bytes=8870  ON=0  ps=0  pi=5
+  RAW[245]: 56 00 03 20 C5 56 00 03 1C 1D 56 00 03 43 FA 56 00 02 D5 41 56 00 02 AD 40 56 00 02 8D D5 56 00 01 0A 60 56 00 00 D8 D4 ...
+  PARSED: 49
+[22:48:37.714] TICK #567  avail=242  bytes=9115  ON=0  ps=0  pi=5
+  RAW[242]: 56 00 01 DC 13 56 00 00 E5 7C 56 00 00 D5 6E 56 00 00 D7 54 56 00 00 DF BF 56 00 02 0F 69 56 00 03 1B F7 56 00 03 0B C1 ...
+  PARSED: 48
+[22:48:37.757] TICK #569  avail=244  bytes=9357  ON=0  ps=1  pi=2
+  RAW[244]: 01 13 E0 56 00 02 F5 80 56 00 03 2F 96 56 00 03 20 C7 56 00 03 40 58 56 00 03 41 7F 56 00 02 F5 51 56 00 02 DA C9 56 00 ...
+  PARSED: 49
+[22:48:37.781] TICK #570  avail=244  bytes=9601  ON=0  ps=1  pi=1
+  RAW[244]: 00 03 38 5B 56 00 03 0D 43 56 00 03 0F A2 56 00 02 D4 B4 56 00 02 67 7D 56 00 01 6B A7 56 00 00 D9 21 56 00 00 CF 94 56 ...
+  PARSED: 49
+[22:48:37.824] TICK #572  avail=244  bytes=9845  ON=0  ps=0  pi=5
+  RAW[244]: 56 00 00 F7 83 56 00 00 D4 CE 56 00 00 D2 EF 56 00 00 D3 54 56 00 01 88 06 56 00 02 DF 30 56 00 03 29 10 56 00 03 2B 1B ...
+  PARSED: 48
+[22:48:37.847] TICK #573  avail=241  bytes=10089  ON=0  ps=1  pi=4
+  RAW[241]: AE 56 00 03 45 C3 56 00 03 35 B2 56 00 03 2B B0 56 00 03 3E 21 56 00 03 65 4E 56 00 02 F8 B7 56 00 02 FE 95 56 00 02 60 ...
+  PARSED: 49
+[22:48:37.890] TICK #575  avail=245  bytes=10330  ON=0  ps=0  pi=5
+  RAW[245]: 56 00 03 1B 55 56 00 03 1C 36 56 00 02 CA C6 56 00 02 97 89 56 00 01 BC EF 56 00 00 D8 A0 56 00 00 CE 88 56 00 00 D1 6D ...
+  PARSED: 49
+[22:48:37.912] TICK #576  avail=240  bytes=10575  ON=0  ps=0  pi=5
+  RAW[240]: 56 00 00 D7 82 56 00 00 D3 C3 56 00 00 D0 50 56 00 01 21 54 56 00 02 B8 CD 56 00 03 1C 50 56 00 03 37 B9 56 00 03 45 58 ...
+  PARSED: 48
+[22:48:37.957] TICK #578  avail=240  bytes=10815  ON=0  ps=0  pi=5
+  RAW[240]: 56 00 03 38 51 56 00 03 10 FC 56 00 03 54 5D 56 00 03 3B 2D 56 00 03 5F 91 56 00 03 29 20 56 00 03 58 85 56 00 02 A5 18 ...
+  PARSED: 48
+[22:48:37.979] TICK #579  avail=245  bytes=11055  ON=0  ps=0  pi=5
+  RAW[245]: 56 00 03 3D CC 56 00 03 38 A0 56 00 03 00 30 56 00 02 7C 90 56 00 02 7B 3E 56 00 01 07 67 56 00 00 D0 55 56 00 00 D0 51 ...
+  PARSED: 49
+[22:48:38.022] TICK #581  avail=243  bytes=11300  ON=0  ps=0  pi=5
+  RAW[243]: 56 00 00 D9 BB 56 00 00 CA 85 56 00 00 CD 29 56 00 00 E1 CA 56 00 02 6C A4 56 00 02 FA A9 56 00 02 F8 B0 56 00 03 21 2A ...
+  PARSED: 48
+[22:48:38.044] TICK #582  avail=242  bytes=11543  ON=0  ps=1  pi=3
+  RAW[242]: E4 8D 56 00 02 F5 B5 56 00 03 3A 99 56 00 03 6D 49 56 00 03 9E 67 56 00 03 70 74 56 00 03 41 50 56 00 02 EC 01 56 00 02 ...
+  PARSED: 49
+[22:48:38.087] TICK #584  avail=241  bytes=11785  ON=0  ps=0  pi=5
+  RAW[241]: 56 00 03 72 87 56 00 03 23 DB 56 00 02 B2 EC 56 00 02 9C 1C 56 00 01 29 84 56 00 00 D4 D1 56 00 00 D4 74 56 00 00 D0 60 ...
+  PARSED: 48
+[22:48:38.109] TICK #585  avail=242  bytes=12026  ON=0  ps=1  pi=1
+  RAW[242]: 00 00 E0 70 56 00 00 C4 E2 56 00 00 CC 4B 56 00 00 D9 A7 56 00 01 F1 ED 56 00 03 41 F3 56 00 03 41 37 56 00 03 3F 0D 56 ...
+  PARSED: 48
+[22:48:38.154] TICK #587  avail=244  bytes=12268  ON=0  ps=1  pi=3
+  RAW[244]: CF A3 56 00 03 56 EC 56 00 03 92 81 56 00 03 7D ED 56 00 03 65 37 56 00 03 60 2A 56 00 03 3B BB 56 00 03 15 C2 56 00 02 ...
+  PARSED: 49
+[22:48:38.175] TICK #588  avail=243  bytes=12512  ON=0  ps=1  pi=2
+  RAW[243]: 03 2E 7B 56 00 03 2B F1 56 00 02 F1 95 56 00 02 8E 80 56 00 01 B0 C1 56 00 00 D2 CC 56 00 00 C8 49 56 00 00 C0 EF 56 00 ...
+  PARSED: 49
+[22:48:38.218] TICK #590  avail=247  bytes=12755  ON=0  ps=0  pi=5
+  RAW[247]: 56 00 00 C6 70 56 00 00 C3 BE 56 00 00 C2 12 56 00 01 37 AA 56 00 03 03 CE 56 00 03 2D 49 56 00 02 DB 1D 56 00 03 2E 51 ...
+  PARSED: 48
+[22:48:38.243] TICK #591  avail=244  bytes=13002  ON=0  ps=1  pi=2
+  RAW[244]: 03 31 F3 56 00 03 3C E1 56 00 03 3C 66 56 00 03 4D A8 56 00 03 45 A0 56 00 03 40 20 56 00 03 30 F1 56 00 02 D9 92 56 00 ...
+  PARSED: 49
+[22:48:38.287] TICK #593  avail=246  bytes=13246  ON=0  ps=1  pi=1
+  RAW[246]: 00 03 76 E6 56 00 02 F6 C8 56 00 02 D6 E2 56 00 02 81 A1 56 00 00 E1 49 56 00 00 BC 66 56 00 00 C2 22 56 00 00 C4 D2 56 ...
+  PARSED: 49
+[22:48:38.308] TICK #594  avail=242  bytes=13492  ON=0  ps=1  pi=2
+  RAW[242]: 00 BC 82 56 00 00 BC 73 56 00 00 EC C7 56 00 02 C2 25 56 00 03 3A 8F 56 00 03 2A 57 56 00 03 65 0D 56 00 03 8E F0 56 00 ...
+  PARSED: 48
+[22:48:38.352] TICK #596  avail=243  bytes=13734  ON=0  ps=1  pi=4
+  RAW[243]: 7A 56 00 03 39 90 56 00 03 47 AA 56 00 03 4C D7 56 00 03 4C 04 56 00 03 61 62 56 00 03 03 CE 56 00 02 A2 33 56 00 01 97 ...
+  PARSED: 49
+[22:48:38.375] TICK #597  avail=242  bytes=13977  ON=0  ps=1  pi=2
+  RAW[242]: 03 26 3B 56 00 02 AF 6B 56 00 02 96 16 56 00 01 18 EB 56 00 00 C2 25 56 00 00 C4 5E 56 00 00 C2 4A 56 00 01 3B 69 56 00 ...
+  PARSED: 48
+[22:48:38.418] TICK #599  avail=244  bytes=14219  ON=0  ps=1  pi=4
+  RAW[244]: F8 56 00 00 C0 30 56 00 00 BC 96 56 00 01 DC 61 56 00 03 43 AB 56 00 03 22 BE 56 00 03 0E 89 56 00 03 4D DF 56 00 03 5F ...
+  PARSED: 49
+[22:48:38.441] TICK #600  avail=242  bytes=14463  ON=0  ps=1  pi=3
+  RAW[242]: 42 FE 56 00 03 59 DC 56 00 03 49 05 56 00 03 39 1F 56 00 03 4A 9E 56 00 03 0B DB 56 00 02 EE 9F 56 00 02 48 F0 56 00 00 ...
+  PARSED: 49
+[22:48:38.484] TICK #602  avail=241  bytes=14705  ON=0  ps=0  pi=5
+  RAW[241]: 56 00 02 E6 BF 56 00 02 9A 5F 56 00 01 BA 78 56 00 00 C7 C8 56 00 00 B8 CD 56 00 00 B5 73 56 00 00 CA 5A 56 00 02 9E 57 ...
+  PARSED: 48
+[22:48:38.506] TICK #603  avail=240  bytes=14946  ON=0  ps=1  pi=1
+  RAW[240]: 00 00 BC DC 56 00 00 BA 82 56 00 01 3A 12 56 00 03 16 E9 56 00 03 38 35 56 00 03 22 C9 56 00 03 48 DC 56 00 03 41 B7 56 ...
+  PARSED: 48
+[22:48:38.550] TICK #605  avail=242  bytes=15186  ON=0  ps=1  pi=1
+  RAW[242]: 00 03 53 31 56 00 03 88 F8 56 00 03 4C 14 56 00 03 33 D7 56 00 03 4D 13 56 00 03 73 98 56 00 02 D5 C0 56 00 02 A8 4C 56 ...
+  PARSED: 48
+[22:48:38.573] TICK #606  avail=246  bytes=15428  ON=0  ps=1  pi=3
+  RAW[246]: 2C 1A 56 00 02 FF BE 56 00 02 86 90 56 00 02 66 7B 56 00 00 D3 AE 56 00 00 B2 4E 56 00 00 C8 B1 56 00 00 C8 35 56 00 02 ...
+  PARSED: 49
+[22:48:38.616] TICK #608  avail=244  bytes=15674  ON=0  ps=1  pi=4
+  RAW[244]: 1C 56 00 00 B0 10 56 00 00 DF 53 56 00 02 D1 D4 56 00 03 85 60 56 00 03 41 8F 56 00 03 5F 9A 56 00 03 4F 57 56 00 03 2D ...
+  PARSED: 49
+[22:48:38.638] TICK #609  avail=237  bytes=15918  ON=0  ps=1  pi=3
+  RAW[237]: 74 58 56 00 03 51 3E 56 00 03 50 19 56 00 03 37 B2 56 00 03 0F 14 56 00 02 C5 C6 56 00 02 CA 28 56 00 01 B2 D9 56 00 00 ...
+  PARSED: 48
+[22:48:38.682] TICK #611  avail=244  bytes=16155  ON=0  ps=0  pi=5
+  RAW[244]: 56 00 03 00 07 56 00 02 BD A2 56 00 02 BD 40 56 00 00 F8 C1 56 00 00 B6 FE 56 00 00 B8 0C 56 00 00 B5 10 56 00 01 2C BD ...
+  PARSED: 48
+[22:48:38.705] TICK #612  avail=240  bytes=16399  ON=0  ps=1  pi=4
+  RAW[240]: 29 56 00 00 B5 CC 56 00 00 C3 98 56 00 02 24 32 56 00 03 4D 69 56 00 03 86 EA 56 00 03 67 1F 56 00 03 76 C2 56 00 03 28 ...
+  PARSED: 48
+[22:48:38.728] TICK #613  avail=1  bytes=16639  ON=0  ps=1  pi=4
+  RAW[1]: 11 
+  PARSED: 1
+[22:48:38.751] TICK #614  avail=245  bytes=16640  ON=0  ps=0  pi=5
+  RAW[245]: 56 00 03 54 7F 56 00 03 9A 6F 56 00 03 5F D4 56 00 03 5E 0B 56 00 03 29 6F 56 00 03 3E B7 56 00 02 DA D9 56 00 02 56 88 ...
+  PARSED: 49
+[22:48:38.773] TICK #615  avail=246  bytes=16885  ON=0  ps=0  pi=5
+  RAW[246]: 56 00 03 03 FF 56 00 02 C9 E4 56 00 01 A1 D4 56 00 00 B9 1C 56 00 00 A8 B0 56 00 00 AD B1 56 00 00 C8 85 56 00 02 FE E3 ...
+  PARSED: 49
+[22:48:38.817] TICK #617  avail=248  bytes=17131  ON=0  ps=1  pi=1
+  RAW[248]: 00 00 B3 E1 56 00 01 7F 7E 56 00 03 4D 3E 56 00 03 91 D3 56 00 03 80 25 56 00 03 8C 50 56 00 03 AC CA 56 00 03 53 09 56 ...
+  PARSED: 49
+[22:48:38.839] TICK #618  avail=236  bytes=17379  ON=0  ps=1  pi=4
+  RAW[236]: 04 56 00 03 3B 46 56 00 03 64 2B 56 00 03 78 32 56 00 02 B6 3D 56 00 02 8D FD 56 00 00 FD 54 56 00 00 AB 0D 56 00 00 B4 ...
+  PARSED: 48
+[22:48:38.883] TICK #620  avail=254  bytes=17615  ON=0  ps=0  pi=5
+  RAW[254]: 56 00 02 A5 4E 56 00 02 27 C1 56 00 00 B1 A2 56 00 00 A9 43 56 00 00 BD 65 56 00 00 BD 95 56 00 02 52 99 56 00 03 9D 66 ...
+  PARSED: 50
+[22:48:38.926] TICK #622  avail=246  bytes=17869  ON=0  ps=1  pi=4
+  RAW[246]: E0 56 00 03 73 1D 56 01 00 00 00 56 00 03 86 36 56 00 03 BE 21 56 00 03 B3 4D 56 00 03 B3 3D 56 00 03 B1 D1 56 00 02 E6 ...
+[22:48:38.927] HEARTBEAT bytes=18115
+  PARSED: 49
+[22:48:38.949] TICK #623  avail=242  bytes=18115  ON=0  ps=0  pi=5
+  RAW[242]: 56 00 03 7E E8 56 00 03 7A 0E 56 00 03 2D 3E 56 00 03 10 6E 56 00 01 9D 90 56 00 00 AA D6 56 00 00 A5 DE 56 00 00 B7 80 ...
+  PARSED: 48
+[22:48:38.993] TICK #625  avail=242  bytes=18357  ON=0  ps=1  pi=2
+  RAW[242]: 00 F4 DF 56 00 00 A1 33 56 00 00 A1 5D 56 00 00 B3 F4 56 00 01 80 3A 56 00 03 8C 23 56 00 03 85 60 56 00 03 9A EB 56 00 ...
+  PARSED: 48
+[22:48:39.015] TICK #626  avail=241  bytes=18599  ON=0  ps=1  pi=4
+  RAW[241]: 5A 56 00 03 A5 30 56 00 03 9B 52 56 00 03 BB CC 56 00 03 A5 9E 56 00 03 3D 69 56 00 03 66 98 56 00 03 45 45 56 00 02 F1 ...
+  PARSED: 49
+[22:48:39.060] TICK #628  avail=245  bytes=18840  ON=0  ps=0  pi=5
+  RAW[245]: 56 00 03 7E 9A 56 00 03 75 AD 56 00 03 28 A6 56 00 02 C4 3C 56 00 02 4C 17 56 00 00 B6 41 56 00 00 A1 98 56 00 00 A8 81 ...
+  PARSED: 49
+[22:48:39.082] TICK #629  avail=240  bytes=19085  ON=0  ps=0  pi=5
+  RAW[240]: 56 00 00 A7 0D 56 00 00 A3 7D 56 00 00 9E 02 56 00 00 C2 B8 56 00 03 32 BC 56 00 03 84 2E 56 00 03 8F 97 56 00 03 98 86 ...
+  PARSED: 48
+[22:48:39.124] TICK #631  avail=243  bytes=19325  ON=0  ps=0  pi=5
+  RAW[243]: 56 00 03 5A 68 56 00 03 B9 BA 56 00 03 AC E0 56 00 03 8A 17 56 00 03 A1 B8 56 00 03 8A 9F 56 00 03 70 10 56 00 02 E5 C4 ...
+  PARSED: 48
+[22:48:39.146] TICK #632  avail=242  bytes=19568  ON=0  ps=1  pi=3
+  RAW[242]: 7A BB 56 00 03 9A 60 56 00 03 7A 10 56 00 02 F5 A8 56 00 02 BC 01 56 00 00 E4 70 56 00 00 A2 BE 56 00 00 A8 BE 56 00 00 ...
+  PARSED: 49
+[22:48:39.189] TICK #634  avail=242  bytes=19810  ON=0  ps=0  pi=5
+  RAW[242]: 56 00 00 B0 09 56 00 00 A2 34 56 00 00 AF 6C 56 00 00 A7 C8 56 00 02 2F 8A 56 00 03 9F E5 56 00 03 B2 FB 56 00 03 B2 D6 ...
+  PARSED: 48
+[22:48:39.211] TICK #635  avail=242  bytes=20052  ON=0  ps=1  pi=2
+  RAW[242]: 03 08 B8 56 00 03 53 5E 56 00 03 54 C2 56 00 03 90 06 56 00 03 C3 DA 56 00 03 91 25 56 00 03 69 38 56 00 02 EC 68 56 00 ...
+  PARSED: 48

@@ -1,5 +1,5 @@
 % 1. Parámetros principales (¡Cambia 'fs' por tu frecuencia real!)
-fs = 1020;              % Frecuencia de muestreo en Hz
+fs = 1465;              % Frecuencia de muestreo en Hz
 Nyq = fs / 2;           % Frecuencia de Nyquist
 
 % 2. Definición de las bandas (Frecuencias en Hz)
@@ -36,7 +36,7 @@ w = [peso_paso, peso_50Hz, peso_paso, peso_100Hz];
 N = 128; 
 
 % 6. Generación de los coeficientes FIR
-coeficientes_b = firpm(800, [0 100, 110 510]/510, [1 1, 0 0], [1, 1/(10^(-200 / 20))]);%firpm(N, f_norm, a, w);
+coeficientes_b = firpm(800, [0 100, 110 1465]/1465, [1 1, 0 0], [1, 1/(10^(-100 / 20))]);%firpm(N, f_norm, a, w);
 
 % firpm(400, [0 45, 49 51, 55 90, 100 510]/510, [1 1, 0 0, 1 1, 0 0], [1, 1/(10^(-40 / 20)), 1, 1/(10^(-100 / 20))]);
 
