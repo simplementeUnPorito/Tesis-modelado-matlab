@@ -1,11 +1,14 @@
 function geophone_scope_simple()
 % geophone_scope_simple — Interfaz PSoC5, sistema de entidades y muestras
 %
-% Protocolo RX (5 bytes, UART):
-%   Data:      [0x56][0x00][b2][b1][b0]   int24 big-endian signed
-%   Heartbeat: [0x56][0x01][0x00][0x00][0x00]
-%   ADC: 18-bit, +-6.144V, buf gain=2, Left Bit-23
-%   scale = 1000/(21333*2*64) mV/count
+% Protocolo RX — 4 bytes datos/HB, 5 bytes cfg/estado:
+%   Data:     [0x56][TYPE:4|CH:2|D17:1|D16:1][D15:D8][D7:D0]  18-bit signed
+%   HB:       [0x56][0x10][0x00][0x00]
+%   CFG-ADC:  [0x56][0x20][res][fsH][fsL]
+%   CFG-PGA:  [0x56][0x30|code][vrefH][vrefL][0]
+%   VREF_ST:  [0x56][0x40][vdac_p][vdac_n][0x01]
+%   VREF_CFG: [0x56][0x50][vdac_p][vdac_n][0x00]
+%   AMUX_ST:  [0x56][0x60|ch][0][0][0]
 %
 % Filtro FIR: cualquier cmd MATLAB que retorne b, ej: fir1(40, 0.1)
 %
@@ -89,6 +92,8 @@ function geophone_scope_simple()
     S.dc_mean_mv   = 0;      % promedio DC actual de la señal (mV)
     % Configs VRef guardadas por ganancia PGA
     S.servo_configs = struct('pga_code',{},'p_vref',{},'n_vref',{});
+    S.amux_ch    = 0;   % 0=diferencial, 1=CM positiva, 2=CM negativa
+    S.calRunning = false;
 
     defCom  = 'COM7';
     defBaud = 115200;
@@ -103,7 +108,7 @@ function geophone_scope_simple()
             cfg = load(cfgFile);
             flds = {'fs','maxPoints','tWin','filtCmd','filtB','yRange',...
                     'yMin','yMax','yAuto','tMin','tMax','tAuto','dcRemove','showRaw',...
-                    'vdac_p_ref','vdac_n_ref'};
+                    'vdac_p_ref','vdac_n_ref','amux_ch'};
             for k = 1:numel(flds)
                 if isfield(cfg,flds{k}), S.(flds{k}) = cfg.(flds{k}); end
             end
@@ -111,7 +116,13 @@ function geophone_scope_simple()
             if isfield(cfg,'baud'),      defBaud     = cfg.baud;      end
             if isfield(cfg,'entidades'),    S.entidades    = cfg.entidades;    end
             if isfield(cfg,'entCollapsed'), S.entCollapsed = cfg.entCollapsed; end
-            if isfield(cfg,'servo_configs'), S.servo_configs = cfg.servo_configs; end
+            if isfield(cfg,'servo_configs')
+                sc = cfg.servo_configs;
+                % Descartar formato viejo (tiene p_nominal/n_nominal en vez de p_vref/n_vref)
+                if ~isempty(sc) && isfield(sc(1),'p_vref') && isfield(sc(1),'n_vref')
+                    S.servo_configs = sc;
+                end
+            end
             for ei = 1:numel(S.entidades)
                 if ~isfield(S.entidades(ei),'fMin')
                     bw = 0;
@@ -136,7 +147,7 @@ function geophone_scope_simple()
     %   pData    y=127 h=94
     %   pZoom    y=35  h=90
     % =====================================================================
-    fig = uifigure('Name','Geophone Scope','Position',[60 40 1100 1194]);
+    fig = uifigure('Name','Geophone Scope','Position',[60 40 1100 1224]);
     fig.CloseRequestFcn = @onClose;
 
     ax1 = uiaxes(fig,'Position',[20 55 820 1000]);
@@ -151,7 +162,7 @@ function geophone_scope_simple()
     RX=860; RW=225;
 
     % --- Conexion ---
-    pConn = uipanel(fig,'Title','Conexion','Position',[RX 997 RW 116]);
+    pConn = uipanel(fig,'Title','Conexion','Position',[RX 1053 RW 116]);
     uilabel(pConn,'Text','COM:','Position',[8 70 32 20]);
     edtCom  = uieditfield(pConn,'text','Value',defCom,'Position',[44 68 58 22]);
     uilabel(pConn,'Text','Baud:','Position',[110 70 36 20]);
@@ -164,49 +175,63 @@ function geophone_scope_simple()
     lblCfgInfo = uilabel(pConn,'Text','ADC: —  fs: —  PGA: —',...
         'Position',[8 8 210 20],'FontSize',8,'FontAngle','italic');
 
-    % --- Stream + Ver crudo ---
-    pCtrl = uipanel(fig,'Title','Stream','Position',[RX 775 RW 106]);
-    btnStream = uibutton(pCtrl,'Text','START','Position',[8 52 90 28],...
+    % --- Stream + Ver crudo + Modo Vista ---
+    pCtrl = uipanel(fig,'Title','Stream','Position',[RX 775 RW 136]);
+    btnStream = uibutton(pCtrl,'Text','START','Position',[8 82 90 28],...
         'BackgroundColor',CLR_START,'FontColor',[0 0 0],'FontWeight','bold',...
         'ButtonPushedFcn',@onStreamToggle);
-    btnClear = uibutton(pCtrl,'Text','Clear','Position',[106 52 90 28],...
+    btnClear = uibutton(pCtrl,'Text','Clear','Position',[106 82 90 28],...
         'ButtonPushedFcn',@onClear);
-    btnShowRaw = uibutton(pCtrl,'Text','Ver crudo','Position',[8 18 88 26],...
+    btnShowRaw = uibutton(pCtrl,'Text','Ver crudo','Position',[8 48 88 26],...
         'ButtonPushedFcn',@(~,~)onToggleRaw());
     uilabel(pCtrl,'Text','(línea gris --)', ...
-        'Position',[100 20 116 20],'FontSize',8,'FontAngle','italic');
+        'Position',[100 50 116 20],'FontSize',8,'FontAngle','italic');
+    uilabel(pCtrl,'Text','Rama:','Position',[8 14 38 18],'FontSize',8);
+    ddMux = uidropdown(pCtrl,...
+        'Items',{'Diferencial','CM Positiva','CM Negativa'},...
+        'Value','Diferencial',...
+        'Position',[48 12 168 22],'FontSize',8,...
+        'ValueChangedFcn',@(~,~)onMuxChanged());
 
     % --- VRef DC ---
-    pServo = uipanel(fig,'Title','VRef DC','Position',[RX 883 RW 112]);
-    % Fila 2: pVRef y nVRef + Aplicar
-    uilabel(pServo,'Text','pVRef:','Position',[4 70 36 18],'FontSize',8);
+    pServo = uipanel(fig,'Title','VRef DC','Position',[RX 913 RW 138]);
+    % Fila 1: pVRef y nVRef + Aplicar
+    uilabel(pServo,'Text','pVRef:','Position',[4 96 36 18],'FontSize',8);
     edtPVRef = uieditfield(pServo,'numeric','Value',S.vdac_p_ref,...
         'Limits',[0 255],'RoundFractionalValues','on',...
-        'Position',[42 68 36 22],'FontSize',8);
-    uilabel(pServo,'Text','nVRef:','Position',[82 70 36 18],'FontSize',8);
+        'Position',[42 94 36 22],'FontSize',8);
+    uilabel(pServo,'Text','nVRef:','Position',[82 96 36 18],'FontSize',8);
     edtNVRef = uieditfield(pServo,'numeric','Value',S.vdac_n_ref,...
         'Limits',[0 255],'RoundFractionalValues','on',...
-        'Position',[120 68 36 22],'FontSize',8);
-    btnApplyServo = uibutton(pServo,'Text','Aplicar','Position',[160 68 58 22],...
+        'Position',[120 94 36 22],'FontSize',8);
+    btnApplyServo = uibutton(pServo,'Text','Aplicar','Position',[160 94 58 22],...
         'FontSize',8,'BackgroundColor',CLR_ON,'FontColor',[0 0 0],...
         'ButtonPushedFcn',@(~,~)onApplyServo());
-    % Fila 2: botones Guardar y Editar
-    btnGuardarCfg = uibutton(pServo,'Text','Guardar cfg PGA','Position',[4 44 108 22],...
+    % Fila 2: Guardar y Editar
+    btnGuardarCfg = uibutton(pServo,'Text','Guardar cfg PGA','Position',[4 70 108 22],...
         'FontSize',8,'BackgroundColor',CLR_ON,'FontColor',[0 0 0],...
         'Tooltip','Guarda pVRef/nVRef actual como preset para la ganancia PGA activa',...
         'ButtonPushedFcn',@(~,~)onGuardarCfgPGA());
-    btnEditarCfg = uibutton(pServo,'Text','Editar cfg','Position',[118 44 100 22],...
+    btnEditarCfg = uibutton(pServo,'Text','Editar cfg','Position',[118 70 100 22],...
         'FontSize',8,'Tooltip','Ver/editar presets por ganancia PGA',...
         'ButtonPushedFcn',@(~,~)onEditarCfgs());
-    % Fila 1: estado actual + promedio DC
-    uilabel(pServo,'Text','VDp:','Position',[4 18 26 18],'FontSize',8);
-    lblVdacP = uilabel(pServo,'Text','---','Position',[32 18 26 18],...
+    % Fila 3: AutoCal
+    btnAutoCal = uibutton(pServo,'Text','AutoCal p+n','Position',[4 46 100 22],...
+        'FontSize',8,'BackgroundColor',[0.85 0.65 0.10],'FontColor',[0 0 0],...
+        'FontWeight','bold',...
+        'Tooltip','Calibra pVRef (CM+) y nVRef (CM-) automaticamente: va a CM+, calibra, va a CM-, calibra, vuelve a Diferencial.',...
+        'ButtonPushedFcn',@(~,~)onAutoCalibrateVRef());
+    lblCalSt = uilabel(pServo,'Text','CM+→CM-→Dif',...
+        'Position',[108 48 114 18],'FontSize',7.5,'FontAngle','italic');
+    % Fila 4: estado actual + promedio DC
+    uilabel(pServo,'Text','VDp:','Position',[4 20 26 18],'FontSize',8);
+    lblVdacP = uilabel(pServo,'Text','---','Position',[32 20 26 18],...
         'FontSize',8,'FontWeight','bold');
-    uilabel(pServo,'Text','VDn:','Position',[62 18 26 18],'FontSize',8);
-    lblVdacN = uilabel(pServo,'Text','---','Position',[90 18 26 18],...
+    uilabel(pServo,'Text','VDn:','Position',[62 20 26 18],'FontSize',8);
+    lblVdacN = uilabel(pServo,'Text','---','Position',[90 20 26 18],...
         'FontSize',8,'FontWeight','bold');
-    uilabel(pServo,'Text','DC:','Position',[120 18 20 18],'FontSize',8);
-    lblDCMean = uilabel(pServo,'Text','0.0 mV','Position',[142 18 80 18],...
+    uilabel(pServo,'Text','DC:','Position',[120 20 20 18],'FontSize',8);
+    lblDCMean = uilabel(pServo,'Text','0.0 mV','Position',[142 20 80 18],...
         'FontSize',8,'FontWeight','bold');
 
     % --- Filtro FIR + DC ---
@@ -319,6 +344,8 @@ function geophone_scope_simple()
     updateShowRawBtn();
     updateBtnStates();
     updateServoDisplay();
+    if S.amux_ch <= 2, ddMux.Value = ddMux.Items{S.amux_ch + 1}; end
+    updateVRefEnableState();
     refreshTree();
     if ~S.tAuto, try ax1.XLim=[S.tMin S.tMax]; catch, end; end
     if ~S.yAuto, try ax1.YLim=[S.yMin S.yMax]; catch, end; end
@@ -406,10 +433,10 @@ function geophone_scope_simple()
         tieneEnt  = S.entActiva>=1 && S.entActiva<=numel(S.entidades);
         tieneDatos= ~isempty(S.nVec);
         btnGuardar.Enable = tieneEnt && tieneDatos && ~r;
-        ddPGA.Enable     = ~r;   % PGA bloqueado en stream
-        btnSetPGA.Enable = ~r;
-        edtMaxPts.Enable = ~r;   % Max pts bloqueado en stream
-        % edtTWin (Vent pts) siempre habilitado — es solo visual
+        ddPGA.Enable     = c;
+        btnSetPGA.Enable = c;
+        edtMaxPts.Enable = ~r;
+        updateVRefEnableState();
     end
 
     function logMsg(msg)
@@ -532,6 +559,7 @@ function geophone_scope_simple()
             cfg.tMin=S.tMin; cfg.tMax=S.tMax; cfg.tAuto=S.tAuto;
             cfg.dcRemove=S.dcRemove; cfg.showRaw=S.showRaw;
             cfg.vdac_p_ref=S.vdac_p_ref; cfg.vdac_n_ref=S.vdac_n_ref;
+            cfg.amux_ch=S.amux_ch;
             cfg.servo_configs=S.servo_configs;
             cfg.entCollapsed=S.entCollapsed;
             cfg.entidades=S.entidades;
@@ -906,7 +934,6 @@ function geophone_scope_simple()
     end
 
     function onSetPGA()
-        if S.streamEnabled, logMsg('PGA: detén el stream antes de configurar'); return; end
         gain = str2double(ddPGA.Value);
         if ~isfinite(gain), logMsg('PGA: valor inválido'); return; end
         code = pgaGainToCode(gain);
@@ -948,17 +975,16 @@ function geophone_scope_simple()
                 if numel(vBuf) < 5, break; end
                 p    = double(vBuf(1:5));
                 vBuf = vBuf(6:end);
-                if p(2) == 3
+                if p(2) == 3  % CFG_PGA — p(3) = pga_code
                     confirmedCode = p(3);
                     if confirmedCode == code
                         confirmed = true; break;
                     else
                         logMsg(sprintf('PGA: PSoC reporta 0x%02X (esperado 0x%02X)', confirmedCode, code));
                     end
-                elseif p(2) == 4
+                elseif p(2) == 4  % VREF_STATUS
                     S.servo_vdac_p = p(3);
                     S.servo_vdac_n = p(4);
-                    S.servo_valid  = logical(bitand(p(5),1));
                     updateServoDisplay();
                 end
             end
@@ -1090,6 +1116,7 @@ function geophone_scope_simple()
         gotType3 = false;
         gotType4 = false;
         gotType6 = false;
+        gotAmux  = false;
 
         while toc(t0) < 2.0 && (~gotType2 || ~gotType3 || ~gotType4 || ~gotType6)
             pause(0.05);
@@ -1106,7 +1133,7 @@ function geophone_scope_simple()
                 if isempty(idx), cfgBuf = uint8([]); break; end
                 cfgBuf = cfgBuf(idx:end);
                 if numel(cfgBuf) < 5, break; end
-                p    = double(cfgBuf(1:5));
+                p      = double(cfgBuf(1:5));
                 cfgBuf = cfgBuf(6:end);
                 if p(2) == 2
                     S.adc_bits = p(3);
@@ -1120,8 +1147,11 @@ function geophone_scope_simple()
                     S.servo_vdac_p = p(3);
                     S.servo_vdac_n = p(4);
                     gotType4       = true;
+                elseif p(2) == 5  % AMUX_STATUS
+                    S.amux_ch = p(3);
+                    gotAmux   = true;
                 elseif p(2) == 6
-                    S.vdac_p_ref = p(3);   % [pVRef][nVRef][0]
+                    S.vdac_p_ref = p(3);
                     S.vdac_n_ref = p(4);
                     gotType6     = true;
                 end
@@ -1157,6 +1187,11 @@ function geophone_scope_simple()
             edtNVRef.Value = double(S.vdac_n_ref);
             logMsg(sprintf('VRef cfg: pVRef=%d (0x%02X) nVRef=%d (0x%02X)',...
                 S.vdac_p_ref, S.vdac_p_ref, S.vdac_n_ref, S.vdac_n_ref));
+        end
+        if gotAmux && S.amux_ch <= 2
+            ddMux.Value = ddMux.Items{S.amux_ch + 1};
+            updateVRefEnableState();
+            logMsg(sprintf('AMux: %s (ch=%d)', ddMux.Items{S.amux_ch+1}, S.amux_ch));
         end
         try, flush(S.sp); catch, end
         S.rxBuf    = uint8([]);
@@ -1278,7 +1313,7 @@ function geophone_scope_simple()
                         logMsg(sprintf('HEARTBEAT bytes=%d',S.totalBytes));
                         S.parseState=0; continue;
                     end
-                    if pkt(2)==0   % data
+                    if pkt(2)==0   % data — int24 big-endian signed
                         switch S.pktDataBytes
                             case 1
                                 u = pkt(3);
@@ -1291,10 +1326,17 @@ function geophone_scope_simple()
                                 v = u - (pkt(3)>=128)*16777216;
                         end
                         newNotch(end+1,1)=v; %#ok<AGROW>
-                    elseif pkt(2)==4  % VRef status (siempre procesado)
+                    elseif pkt(2)==4  % VREF_STATUS
                         S.servo_vdac_p = pkt(3);
                         S.servo_vdac_n = pkt(4);
                         updateServoDisplay();
+                    elseif pkt(2)==5  % AMUX_STATUS — ch en byte 3
+                        ch = pkt(3);
+                        if ch <= 2
+                            S.amux_ch = ch;
+                            ddMux.Value = ddMux.Items{ch+1};
+                            updateVRefEnableState();
+                        end
                     end
                     S.parseState=0;
                 end
@@ -1349,6 +1391,179 @@ function geophone_scope_simple()
     end
 
     % =====================================================================
+    % AutoCal VRef — minimiza DC en modo CM
+    % =====================================================================
+    function onAutoCalibrateVRef()
+        if ~S.isConnected, logMsg('AutoCal: no conectado'); return; end
+
+        S.calRunning     = true;
+        wasStreamEnabled = S.streamEnabled;
+        S.streamEnabled  = true;
+        lblCalSt.Text    = 'Calibrando...';
+        updateBtnStates();
+        drawnow;
+
+        % Cambia canal AMux, actualiza UI, drena datos del canal anterior
+        function cambiarCanal(ch_nuevo)
+            try, write(S.sp, uint8([0xA7, uint8(ch_nuevo)]), 'uint8'); catch, end
+            S.amux_ch = ch_nuevo;
+            try, ddMux.Value = ddMux.Items{ch_nuevo+1}; catch, end
+            pause(0.15);
+            S.notchVec=[]; S.filtVec=[]; S.nVec=[]; S.frameCount=0; S.filtZi=[]; S.dc_mean_mv=0;
+            set(hRaw,'XData',nan,'YData',nan); set(hNotch,'XData',nan,'YData',nan);
+        end
+
+        % Aplica VDAC, resetea dc_iir, limpia buffer para acumulacion fresca
+        function ok = aplicarVDAC(pV, nV)
+            ok = false;
+            pV = max(0,min(255,round(double(pV))));
+            nV = max(0,min(255,round(double(nV))));
+            try, write(S.sp, uint8([0xAA, uint8(pV), uint8(nV)]), 'uint8'); catch, return; end
+            S.servo_vdac_p=pV; S.servo_vdac_n=nV;
+            edtPVRef.Value=double(pV); edtNVRef.Value=double(nV);
+            updateServoDisplay();
+            pause(0.05);
+            try, write(S.sp, uint8([0xA7, uint8(S.amux_ch)]), 'uint8'); catch, end
+            pause(0.15);
+            S.notchVec=[]; S.filtVec=[]; S.nVec=[]; S.frameCount=0; S.filtZi=[]; S.dc_mean_mv=0;
+            set(hRaw,'XData',nan,'YData',nan); set(hNotch,'XData',nan,'YData',nan);
+            ok = true;
+        end
+
+        % Espera duracion_s seg y mide DC. Ventana FIJA para todos los pasos
+        % de busqueda -> factores IIR identicos -> ratios y comparaciones exactos.
+        % Descarta primeros numel(filtB)-1 muestras (transitorio FIR).
+        function dc = medirDC(duracion_s)
+            t0 = tic;
+            while toc(t0) < duracion_s, pause(0.05); end
+            nFIR = max(0, numel(S.filtB) - 1);
+            raw  = double(S.notchVec);
+            if numel(raw) <= nFIR, dc = 0;
+            else, dc = mean(raw(nFIR+1:end)) * S.scale; end
+        end
+
+        % Calibra un canal. v0=VDAC a optimizar, vOtra=VDAC fijo, esCMPos=bool.
+        % Todas las ventanas de busqueda son 2s (iguales) -> comparacion justa.
+        % La ventana 5s solo se usa al final como reporte, no para decidir.
+        function v_best = calibrarCanal(v0, vOtra, esCMPos)
+            v_best = -1;
+            nom = ddMux.Value;
+
+            % A: medicion inicial
+            if esCMPos, ok=aplicarVDAC(v0,vOtra); else, ok=aplicarVDAC(vOtra,v0); end
+            if ~ok, return; end
+            dc0 = medirDC(2.0);
+            logMsg(sprintf('AutoCal %s: v=%d  DC=%.1f mV', nom, v0, dc0)); drawnow;
+
+            % B: perturbacion para sensibilidad
+            delta_p = 10;
+            v1 = max(0, min(255, v0 + delta_p));
+            if v1 == v0,  v1 = max(0, min(255, v0 - delta_p)); end
+            if v1 == v0,  logMsg(sprintf('AutoCal %s: VDAC en limite', nom)); return; end
+            if esCMPos, ok=aplicarVDAC(v1,vOtra); else, ok=aplicarVDAC(vOtra,v1); end
+            if ~ok, return; end
+            dc1 = medirDC(2.0);
+            logMsg(sprintf('AutoCal %s: v=%d  DC=%.1f mV (perturb)', nom, v1, dc1)); drawnow;
+
+            sens = (dc1 - dc0) / double(v1 - v0);
+            % dc0 y dc1 usan misma ventana -> factor IIR igual -> cancela en dc0/sens
+            if abs(sens) < 0.001
+                logMsg(sprintf('AutoCal %s: sens~0, abortando', nom)); return;
+            end
+
+            % C: estimacion lineal (misma ventana -> factor cancela, estimado correcto)
+            v_est = max(0, min(255, round(v0 - dc0 / sens)));
+            logMsg(sprintf('AutoCal %s: sens=%.2f mV/cnt  v_est=%d', nom, sens, v_est));
+            if esCMPos, ok=aplicarVDAC(v_est,vOtra); else, ok=aplicarVDAC(vOtra,v_est); end
+            if ~ok, return; end
+            dc_est = medirDC(2.0);
+            logMsg(sprintf('AutoCal %s: v=%d  DC=%.1f mV', nom, v_est, dc_est)); drawnow;
+
+            % D: busqueda fina +/-1..4 (todas 2s -> factor IIR identico -> |DC| comparables)
+            best_v  = v_est;
+            best_dc = abs(dc_est);
+            for delta = [-4 -3 -2 -1 1 2 3 4]
+                v_try = max(0, min(255, v_est + delta));
+                if v_try == best_v, continue; end
+                if esCMPos, ok=aplicarVDAC(v_try,vOtra); else, ok=aplicarVDAC(vOtra,v_try); end
+                if ~ok, break; end
+                dc_try = medirDC(2.0);
+                logMsg(sprintf('AutoCal %s: v=%d  DC=%.1f mV', nom, v_try, dc_try)); drawnow;
+                if abs(dc_try) < best_dc
+                    best_dc = abs(dc_try); best_v = v_try;
+                end
+            end
+
+            % E: aplicar mejor, verificacion final 5s (solo reporte)
+            if esCMPos, aplicarVDAC(best_v,vOtra); else, aplicarVDAC(vOtra,best_v); end
+            dc_fin = medirDC(5.0);
+            logMsg(sprintf('AutoCal %s OK: v=%d  |DC|=%.2f mV (5s)', nom, best_v, dc_fin)); drawnow;
+            v_best = best_v;
+        end
+
+        % Secuencia: CM+ -> CM- -> Diferencial
+        pV_ini = S.servo_vdac_p;
+        nV_ini = S.servo_vdac_n;
+
+        logMsg('AutoCal: cambio a CM Positiva (pVRef)');
+        cambiarCanal(1); drawnow;
+        v_p = calibrarCanal(pV_ini, nV_ini, true);
+        if v_p < 0, v_p = pV_ini; logMsg('AutoCal CM+: sin resultado, mantiene original'); end
+
+        logMsg('AutoCal: cambio a CM Negativa (nVRef)');
+        cambiarCanal(2); drawnow;
+        v_n = calibrarCanal(nV_ini, v_p, false);
+        if v_n < 0, v_n = nV_ini; logMsg('AutoCal CM-: sin resultado, mantiene original'); end
+
+        logMsg('AutoCal: volviendo a Diferencial');
+        cambiarCanal(0); drawnow;
+
+        % Guardar en servo_configs para el PGA activo
+        code = S.pga_gain_code;
+        nueva = struct('pga_code',code,'p_vref',v_p,'n_vref',v_n);
+        idx_cfg = findServoCfgByCode(code);
+        if isempty(idx_cfg)
+            if isempty(S.servo_configs), S.servo_configs=nueva;
+            else, S.servo_configs(end+1)=nueva; end
+        else, S.servo_configs(idx_cfg)=nueva; end
+        S.vdac_p_ref=v_p; S.vdac_n_ref=v_n;
+        saveConfig();
+        logMsg(sprintf('AutoCal DONE: PGA %dx  pVRef=%d  nVRef=%d', pgaCodeToGain(code), v_p, v_n));
+        lblCalSt.Text = sprintf('p=%d n=%d', v_p, v_n);
+
+        S.calRunning     = false;
+        S.streamEnabled  = wasStreamEnabled;
+        updateBtnStates();
+        drawnow;
+    end
+
+    % =====================================================================
+    % AMux — modo de vista
+    % =====================================================================
+    function onMuxChanged()
+        ch = find(strcmp(ddMux.Items, ddMux.Value), 1) - 1;
+        S.amux_ch = ch;
+        if S.isConnected
+            try
+                write(S.sp, uint8([0xA7, uint8(ch)]), 'uint8');
+            catch ex
+                logMsg('AMux: error UART — ' + string(ex.message));
+            end
+        end
+        updateVRefEnableState();
+        logMsg(sprintf('Modo: %s (ch=%d)', ddMux.Value, ch));
+    end
+
+    function updateVRefEnableState()
+        en = (S.amux_ch ~= 0);
+        edtPVRef.Enable      = en;
+        edtNVRef.Enable      = en;
+        btnApplyServo.Enable = en;
+        btnGuardarCfg.Enable = en;
+        btnAutoCal.Enable    = S.isConnected && ~S.calRunning;
+    end
+
+    % =====================================================================
     % Configs de servo por ganancia PGA
     % =====================================================================
     function idx = findServoCfgByCode(code)
@@ -1361,73 +1576,106 @@ function geophone_scope_simple()
     end
 
     function onGuardarCfgPGA()
-        code = S.pga_gain_code;
-        nueva = struct('pga_code', code, ...
-                       'p_vref',  max(0, min(255, round(double(edtPVRef.Value)))), ...
-                       'n_vref',  max(0, min(255, round(double(edtNVRef.Value)))));
-        idx = findServoCfgByCode(code);
-        if isempty(idx)
-            if isempty(S.servo_configs), S.servo_configs = nueva;
-            else, S.servo_configs(end+1) = nueva; end
-            logMsg(sprintf('Servo cfg creada para PGA %dx', pgaCodeToGain(code)));
-        else
-            S.servo_configs(idx) = nueva;
-            logMsg(sprintf('Servo cfg actualizada para PGA %dx', pgaCodeToGain(code)));
+        try
+            code = S.pga_gain_code;
+            pV = double(S.servo_vdac_p);
+            nV = double(S.servo_vdac_n);
+            nueva = struct('pga_code', code, 'p_vref', pV, 'n_vref', nV);
+            idx = findServoCfgByCode(code);
+            if isempty(idx)
+                if isempty(S.servo_configs), S.servo_configs = nueva;
+                else, S.servo_configs(end+1) = nueva; end
+                logMsg(sprintf('Cfg guardada: PGA %dx  pV=%d  nV=%d', pgaCodeToGain(code),pV,nV));
+            else
+                S.servo_configs(idx) = nueva;
+                logMsg(sprintf('Cfg actualizada: PGA %dx  pV=%d  nV=%d', pgaCodeToGain(code),pV,nV));
+            end
+            edtPVRef.Value = pV;
+            edtNVRef.Value = nV;
+            saveConfig();
+        catch ex
+            logMsg('ERROR Guardar cfg PGA: ' + string(ex.message));
         end
-        saveConfig();
     end
 
     function onEditarCfgs()
-        if isempty(S.servo_configs)
-            logMsg('No hay configuraciones de servo guardadas'); return;
+        try
+            if isempty(S.servo_configs)
+                logMsg('No hay configuraciones de servo guardadas'); return;
+            end
+            gainNames = {'1x','2x','4x','8x','16x','24x','32x','48x','50x'};
+            nCfg = numel(S.servo_configs);
+            data = cell(nCfg, 3);
+            for ii = 1:nCfg
+                c = S.servo_configs(ii);
+                gIdx = max(1, min(9, c.pga_code + 1));
+                data{ii,1} = gainNames{gIdx};
+                data{ii,2} = double(c.p_vref);
+                data{ii,3} = double(c.n_vref);
+            end
+            dlg = uifigure('Name','Presets Servo DC por PGA',...
+                'Position',[200 350 620 230]);
+            tbl = uitable(dlg,'Data',data,...
+                'ColumnName',{'PGA','pVRef','nVRef'},...
+                'ColumnEditable',[false true true],...
+                'ColumnWidth',{80 80 80},...
+                'Position',[8 48 604 150]);
+            uibutton(dlg,'Text','Guardar cambios','Position',[8 8 130 32],...
+                'BackgroundColor',CLR_ON,'FontWeight','bold',...
+                'ButtonPushedFcn',@(~,~)guardarCambios());
+            uibutton(dlg,'Text','Eliminar seleccion','Position',[148 8 130 32],...
+                'BackgroundColor',CLR_DEL,'FontColor',[1 1 1],...
+                'ButtonPushedFcn',@(~,~)eliminarSeleccion());
+            uibutton(dlg,'Text','Cerrar','Position',[530 8 80 32],...
+                'ButtonPushedFcn',@(~,~)delete(dlg));
+        catch ex
+            logMsg('ERROR Editar cfg: ' + string(ex.message));
         end
-        gainNames = {'1x','2x','4x','8x','16x','24x','32x','48x','50x'};
-        nCfg = numel(S.servo_configs);
-        data = cell(nCfg, 3);
-        for ii = 1:nCfg
-            c = S.servo_configs(ii);
-            gIdx = max(1, min(9, c.pga_code + 1));
-            data{ii,1} = gainNames{gIdx};
-            data{ii,2} = double(c.p_vref);
-            data{ii,3} = double(c.n_vref);
-        end
-
-        dlg = uifigure('Name','Presets Servo DC por PGA',...
-            'Position',[200 350 620 230],'WindowStyle','modal');
-        tbl = uitable(dlg,'Data',data,...
-            'ColumnName',{'PGA','pVRef','nVRef'},...
-            'ColumnEditable',[false true true],...
-            'ColumnWidth',{80 80 80},...
-            'Position',[8 48 604 150]);
-        uibutton(dlg,'Text','Guardar cambios','Position',[8 8 130 32],...
-            'BackgroundColor',CLR_ON,'FontWeight','bold',...
-            'ButtonPushedFcn',@(~,~)guardarCambios());
-        uibutton(dlg,'Text','Eliminar selección','Position',[148 8 130 32],...
-            'BackgroundColor',CLR_DEL,'FontColor',[1 1 1],...
-            'ButtonPushedFcn',@(~,~)eliminarSeleccion());
-        uibutton(dlg,'Text','Cerrar','Position',[530 8 80 32],...
-            'ButtonPushedFcn',@(~,~)delete(dlg));
 
         function guardarCambios()
-            d = tbl.Data;
-            for jj = 1:size(d,1)
-                S.servo_configs(jj).p_vref = max(0, min(255, round(double(d{jj,2}))));
-                S.servo_configs(jj).n_vref = max(0, min(255, round(double(d{jj,3}))));
+            try
+                d = tbl.Data;
+                nRows = size(d,1);
+                for jj = 1:nRows
+                    if iscell(d)
+                        raw2 = d{jj,2}; raw3 = d{jj,3};
+                    else
+                        raw2 = d{jj,2}; raw3 = d{jj,3};
+                        if iscell(raw2), raw2=raw2{1}; end
+                        if iscell(raw3), raw3=raw3{1}; end
+                    end
+                    if ischar(raw2)||isstring(raw2), raw2=str2double(raw2); end
+                    if ischar(raw3)||isstring(raw3), raw3=str2double(raw3); end
+                    S.servo_configs(jj).p_vref = max(0,min(255,round(double(raw2))));
+                    S.servo_configs(jj).n_vref = max(0,min(255,round(double(raw3))));
+                end
+                saveConfig();
+                cfgIdx = findServoCfgByCode(S.pga_gain_code);
+                if ~isempty(cfgIdx)
+                    edtPVRef.Value = double(S.servo_configs(cfgIdx).p_vref);
+                    edtNVRef.Value = double(S.servo_configs(cfgIdx).n_vref);
+                end
+                logMsg('Presets servo guardados');
+                delete(dlg);
+            catch ex
+                logMsg('ERROR guardar cambios: ' + string(ex.message));
             end
-            saveConfig();
-            logMsg('Presets servo guardados');
-            delete(dlg);
         end
 
         function eliminarSeleccion()
-            sel = tbl.Selection;
-            if isempty(sel), logMsg('Seleccioná una fila para eliminar'); return; end
-            row = sel(1);
-            code = S.servo_configs(row).pga_code;
-            S.servo_configs(row) = [];
-            saveConfig();
-            logMsg(sprintf('Preset servo PGA %dx eliminado', pgaCodeToGain(code)));
-            delete(dlg);
+            try
+                sel = tbl.Selection;
+                if isempty(sel), logMsg('Selecciona una fila para eliminar'); return; end
+                row = sel(1);
+                if row < 1 || row > numel(S.servo_configs), return; end
+                code = S.servo_configs(row).pga_code;
+                S.servo_configs(row) = [];
+                saveConfig();
+                logMsg(sprintf('Preset servo PGA %dx eliminado', pgaCodeToGain(code)));
+                delete(dlg);
+            catch ex
+                logMsg('ERROR eliminar: ' + string(ex.message));
+            end
         end
     end
 
