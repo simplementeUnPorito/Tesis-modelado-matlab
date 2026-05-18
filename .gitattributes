@@ -14,3 +14,5 @@
 /InterfazCircuitoAnalogicoSimple/datos/MFB_DigitalFilterLPF.mat filter=lfs diff=lfs merge=lfs -text
 /InterfazCircuitoAnalogicoSimple/logs/scope_20260510_205132.log filter=lfs diff=lfs merge=lfs -text
 /InterfazCircuitoAnalogicoSimple[[:space:]]-[[:space:]]Copy/datos/MFB_DigitalFilterLPF.mat filter=lfs diff=lfs merge=lfs -text
+/SM-24/init_SM24_cache.mat filter=lfs diff=lfs merge=lfs -text
+/SM-24/slprj/modeladvisor/SM24_model_W/570/ModelAdvisorData filter=lfs diff=lfs merge=lfs -text
