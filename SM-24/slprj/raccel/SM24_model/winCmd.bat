@@ -1,2 +1,0 @@
-chcp 65001
-cmd /D /c start "RapidAccelerator" /B "C:\Github\Tesis\src\matlab\SM-24\slprj\raccel\SM24_model\SM24_model.exe" --config "C:\Users\elias\AppData\Local\Temp\raccel_inputpf5cb8f59_23ab_4814_8780_b9ab680d30f9.cfg" -server_info_file "C:\Users\elias\AppData\Local\Temp\tppf5cb8f59_23ab_4814_8780_b9ab680d30f9.info" -tgtconn_server_info_file "C:\Users\elias\AppData\Local\Temp\tgtconnpf5cb8f59_23ab_4814_8780_b9ab680d30f9.info" -tgtconn_port 0 -port 0 -verbose off -w 1>"C:\Github\Tesis\src\matlab\SM-24\slprj\raccel\SM24_model\cmdLog.txt"

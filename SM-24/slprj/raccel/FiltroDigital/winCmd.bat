@@ -1,2 +1,0 @@
-chcp 65001
-cmd /D /c start "RapidAccelerator" /B "C:\Github\Tesis\src\matlab\SM-24\slprj\raccel\FiltroDigital\FiltroDigital.exe" --config "C:\Users\elias\AppData\Local\Temp\raccel_inputpd5ea58f7_fdc2_44a6_a33a_ba36c33c42f6.cfg" -server_info_file "C:\Users\elias\AppData\Local\Temp\tppd5ea58f7_fdc2_44a6_a33a_ba36c33c42f6.info" -tgtconn_server_info_file "C:\Users\elias\AppData\Local\Temp\tgtconnpd5ea58f7_fdc2_44a6_a33a_ba36c33c42f6.info" -tgtconn_port 0 -port 0 -verbose off -w 1>"C:\Github\Tesis\src\matlab\SM-24\slprj\raccel\FiltroDigital\cmdLog.txt"
