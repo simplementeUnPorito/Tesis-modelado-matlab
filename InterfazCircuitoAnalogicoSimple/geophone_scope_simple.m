@@ -95,6 +95,7 @@ function geophone_scope_simple()
     S.lineF0 = 50;
     S.lineHarmMax = 1;
     S.lineMu = 0.001;
+    S.lineEpsilon = 1e-6;   % factor de regularizacion NLMS
     S.lineWeights = [];
 
     S.entidades   = struct('nombre',{},'fs',{},'observ',{},'fMin',{},'fMax',{},'ganancia',{});
@@ -133,7 +134,7 @@ function geophone_scope_simple()
             cfg = load(cfgFile);
             flds = {'fs','maxPoints','tWin','filtCmd','filtB','yRange',...
                     'yMin','yMax','yAuto','tMin','tMax','tAuto','dcRemove','showRaw',...
-                    'lineCancel','lineF0','lineHarmMax','lineMu',...
+                    'lineCancel','lineF0','lineHarmMax','lineMu','lineEpsilon',...
                     'vdac_ref','vdac_pga_code','vdac_auto_gain','vref_target_v','psoc_tx_mode'};
             for k = 1:numel(flds)
                 if isfield(cfg,flds{k}), S.(flds{k}) = cfg.(flds{k}); end
@@ -264,10 +265,10 @@ function geophone_scope_simple()
     pFilt = uipanel(fig,'Title','Filtro FIR MATLAB','Position',[RX 649 RW 124]);
     uilabel(pFilt,'Text','Cmd (retorna b):','Position',[8 80 140 18]);
     edtFiltCmd = uieditfield(pFilt,'text','Value',S.filtCmd,'Position',[8 56 148 24]);
-    uibutton(pFilt,'Text','Aplicar','Position',[160 56 52 24],...
-        'ButtonPushedFcn',@(~,~)onApplyFilter());
-    uibutton(pFilt,'Text','Quitar FIR','Position',[160 28 52 22],...
-        'ButtonPushedFcn',@(~,~)onQuitFilter());
+    % Botón toggle único: "Aplicar filtro" / "Quitar filtro"
+    btnFiltToggle = uibutton(pFilt,'Text','Aplicar filtro',...
+        'Position',[160 28 52 52],'FontSize',8,...
+        'ButtonPushedFcn',@(~,~)onFiltToggle());
     lblFiltSt = uilabel(pFilt,'Text',filtStatusStr(),...
         'Position',[8 28 148 22],'FontAngle','italic');
     btnDC = uibutton(pFilt,'Text','Quitar DC','Position',[8 4 90 22],...
@@ -379,7 +380,8 @@ function geophone_scope_simple()
     refreshTree();
     if ~S.tAuto, try ax1.XLim=[S.tMin S.tMax]; catch, end; end
     if ~S.yAuto, try ax1.YLim=[S.yMin S.yMax]; catch, end; end
-    if ~isempty(S.filtB), edtFiltCmd.Value=S.filtCmd; lblFiltSt.Text=filtStatusStr(); end
+    if ~isempty(S.filtB), edtFiltCmd.Value=S.filtCmd; end
+    updateFiltBtn();
 
     % =====================================================================
     % Helpers
@@ -550,6 +552,12 @@ function geophone_scope_simple()
     end
 
     function y = applyLineCanceller(x, nIdx)
+        % Cancelador adaptativo NLMS de ruido de linea.
+        % Estima y cancela f0 y sus armonicos h=1..hUse usando una base
+        % senoidal: ref = [sin(h*phi), cos(h*phi)] para h = 1..hUse.
+        % Actualizacion NLMS: w += mu * e * ref / (epsilon + ref'*ref)
+        % Nota: ref'*ref = hUse siempre (suma de sin^2 + cos^2 por armonico),
+        % por lo que el denominador NLMS es constante en epsilon + hUse.
         y = double(x(:));
         if ~S.lineCancel || isempty(y)
             return;
@@ -560,33 +568,42 @@ function geophone_scope_simple()
             return;
         end
 
-        L = 2 * hUse;
+        L = 2 * hUse;   % 2 coeficientes (sin + cos) por armonico
         if numel(S.lineWeights) ~= L
+            % Reinicializar pesos si cambio el numero de armonicos
             S.lineWeights = zeros(L, 1);
         end
 
-        fsVal = double(S.fs);
-        f0Val = double(S.lineF0);
-        mu = double(S.lineMu);
-        if ~isfinite(mu) || mu <= 0, mu = 0.001; end
-        mu = min(mu, 0.1);
+        fsVal   = double(S.fs);
+        f0Val   = double(S.lineF0);
+        mu      = double(S.lineMu);
+        epsilon = double(S.lineEpsilon);
+        if ~isfinite(mu)      || mu      <= 0, mu      = 0.001; end
+        if ~isfinite(epsilon) || epsilon <= 0, epsilon = 1e-6;  end
+        mu = min(mu, 0.5);
 
         harmonics = (1:hUse).';
-        w = double(S.lineWeights(:));
-        n0 = double(nIdx(:)) - 1;
+        w  = double(S.lineWeights(:));
+        n0 = double(nIdx(:)) - 1;   % indices 0-based desde frameCount
         if numel(n0) ~= numel(y)
             n0 = (0:numel(y)-1).';
         end
 
         for ii = 1:numel(y)
-            phase = 2*pi*f0Val*n0(ii)/fsVal;
+            % Vector de referencia senoidal para la muestra ii
+            phase = 2*pi * f0Val * n0(ii) / fsVal;
             ref = zeros(L, 1);
             ref(1:2:end) = sin(harmonics * phase);
             ref(2:2:end) = cos(harmonics * phase);
+
+            % Estimacion del ruido de linea y error residual
             noiseEst = w.' * ref;
-            err = y(ii) - noiseEst;
-            w = w + mu * ref * err;
-            y(ii) = err;
+            err      = y(ii) - noiseEst;
+
+            % Actualizacion NLMS (mas estable que LMS puro en tiempo real)
+            w = w + (mu * err / (epsilon + ref.' * ref)) * ref;
+
+            y(ii) = err;   % senal cancelada = error residual
         end
 
         S.lineWeights = w;
@@ -636,6 +653,31 @@ function geophone_scope_simple()
             btnShowRaw.BackgroundColor=CLR_OFF; btnShowRaw.FontColor=[0 0 0];
         end
         hRaw.Visible = S.showRaw;
+    end
+
+    function updateFiltBtn()
+        % Sincroniza el boton toggle FIR segun si hay filtro activo o no
+        lblFiltSt.Text = filtStatusStr();
+        if isempty(S.filtB)
+            btnFiltToggle.Text = 'Aplicar filtro';
+            btnFiltToggle.BackgroundColor = CLR_OFF;
+            btnFiltToggle.FontColor = [0 0 0];
+            btnFiltToggle.FontWeight = 'normal';
+        else
+            btnFiltToggle.Text = 'Quitar filtro';
+            btnFiltToggle.BackgroundColor = CLR_STOP;
+            btnFiltToggle.FontColor = [1 1 1];
+            btnFiltToggle.FontWeight = 'bold';
+        end
+    end
+
+    function onFiltToggle()
+        % Toggle unico: aplica si no hay filtro, quita si ya hay uno activo
+        if isempty(S.filtB)
+            onApplyFilter();
+        else
+            onQuitFilter();
+        end
     end
 
     function updateLineCancelBtn()
@@ -881,7 +923,7 @@ function geophone_scope_simple()
             cfg.tMin=S.tMin; cfg.tMax=S.tMax; cfg.tAuto=S.tAuto;
             cfg.dcRemove=S.dcRemove; cfg.showRaw=S.showRaw;
             cfg.lineCancel=S.lineCancel; cfg.lineF0=S.lineF0;
-            cfg.lineHarmMax=S.lineHarmMax; cfg.lineMu=S.lineMu;
+            cfg.lineHarmMax=S.lineHarmMax; cfg.lineMu=S.lineMu; cfg.lineEpsilon=S.lineEpsilon;
             cfg.vdac_ref=S.vdac_ref; cfg.vdac_pga_code=S.vdac_pga_code;
             cfg.vdac_auto_gain=S.vdac_auto_gain; cfg.vref_target_v=S.vref_target_v;
             cfg.psoc_tx_mode=S.psoc_tx_mode;
@@ -1369,7 +1411,7 @@ function geophone_scope_simple()
             end
             S.filtB=b(:).'; S.filtCmd=cmd;
             applyFilter(); replot(); saveConfig();
-            lblFiltSt.Text=filtStatusStr();
+            updateFiltBtn();
             logMsg(sprintf('FIR aplicado — N=%d  cmd:%s',numel(b)-1,cmd));
         catch e
             logMsg("ERROR filtro: "+string(e.message));
@@ -1378,7 +1420,7 @@ function geophone_scope_simple()
     function onQuitFilter()
         S.filtB=[]; S.filtCmd='';
         applyFilter(); replot(); saveConfig();
-        lblFiltSt.Text=filtStatusStr(); logMsg("Filtro FIR desactivado.");
+        updateFiltBtn(); logMsg("Filtro FIR desactivado.");
     end
     function onToggleDC()
         S.dcRemove=~S.dcRemove;
