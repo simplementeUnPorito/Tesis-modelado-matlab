@@ -1,14 +1,22 @@
 function geophone_scope_simple()
 % geophone_scope_simple — Interfaz PSoC5, sistema de entidades y muestras
 %
-% Protocolo RX — 4 bytes datos/HB, 5 bytes cfg/estado:
-%   Data:     [0x56][TYPE:4|CH:2|D17:1|D16:1][D15:D8][D7:D0]  18-bit signed
-%   HB:       [0x56][0x10][0x00][0x00]
-%   CFG-ADC:  [0x56][0x20][res][fsH][fsL]
-%   CFG-PGA:  [0x56][0x30|code][vrefH][vrefL][0]
-%   VREF_ST:  [0x56][0x40][vdac_p][vdac_n][0x01]
-%   VREF_CFG: [0x56][0x50][vdac_p][vdac_n][0x00]
-%   AMUX_ST:  [0x56][0x60|ch][0][0][0]
+% Protocolo RX — 5 bytes todos los paquetes:
+%   Data:     [0x56][0x00][b2][b1][b0]  int24 big-endian signed
+%   HB:       [0x56][0x01][pga_code][vdac_val][tx_mode]
+%   CFG-ADC:  [0x56][0x02][res][fsH][fsL]
+%   CFG-PGA:  [0x56][0x03][pga_code][vrefH][vrefL]
+%   CFG-VREF: [0x56][0x04][pgavdac_code][vdac_val][0x00]
+%   ACK:      [0x56][0x07][cmd][val][0x00]  (nuevo)
+%             [0x56][0x07][val][0x00][0x00] (legacy)
+%
+% Comandos TX → PSoC: [0xAB][cmd][param][cmd XOR param]
+%   [0xAB][0xA5][0][0xA5]       request config
+%   [0xAB][0xA1][en][cs]        stream PSoC 0=off, 1=on
+%   [0xAB][0xA6][code][cs]      set PGAgain (0-8)
+%   [0xAB][0xA8][mode][cs]      set tx_mode (0=crudo, 1=filter)
+%   [0xAB][0xA9][code][cs]      set PGAvdac (0-8)
+%   [0xAB][0xAA][v][cs]         set VDAC (0-255)
 %
 % Filtro FIR: cualquier cmd MATLAB que retorne b, ej: fir1(40, 0.1)
 %
@@ -46,6 +54,8 @@ function geophone_scope_simple()
     S.streamTimer  = [];
     S.rxBuf        = uint8([]);
     S.streamEnabled= false;
+    S.streamStartT0= uint64(0);
+    S.noDataWarned = false;
     S.parseState   = 0;
     S.pktBuf       = zeros(5,1,'uint8');
     S.pktIdx       = 0;
@@ -55,17 +65,20 @@ function geophone_scope_simple()
     % Config recibida del PSoC (via paquetes 0x02 y 0x03)
     S.configReceived  = false;
     S.adc_bits        = 18;
-    S.pktDataBytes    = 3;     % 1 / 2 / 3  según ADC bits
-    S.pktTotalBytes   = 5;     % 2 + pktDataBytes
+    S.pktDataBytes    = 3;     % protocolo fijo: int24
+    S.pktTotalBytes   = 5;     % todos los paquetes PSoC son de 5 bytes
     S.pga_gain_code   = 4;     % código PGA (0=1x 1=2x 2=4x 3=8x 4=16x 5=24x 6=32x 7=48x 8=50x)
-    S.vref_halfmv     = 6144;
-    S.scale = (S.vref_halfmv * 2) / 2^24;  % mV/count — escala solo del ADC
+    S.vref_halfmv     = 2500;
+    S.scale = S.vref_halfmv / 2^(S.adc_bits - 1);  % mV/count — ADC signed right-justified
 
     S.maxPoints   = 9000;
     S.nVec        = zeros(0,1);
     S.notchVec    = zeros(0,1);
     S.filtVec     = zeros(0,1);
     S.frameCount  = 0;
+    S.rxJunkBytes = 0;
+    S.rxBadTypes  = 0;
+    S.rxFrames    = 0;
 
     S.fs    = 1020;
     S.tWin  = 5000;
@@ -78,22 +91,34 @@ function geophone_scope_simple()
     S.filtB    = [];
     S.dcRemove = false;
     S.yRange   = 100;
+    S.lineCancel = false;
+    S.lineF0 = 50;
+    S.lineHarmMax = 1;
+    S.lineMu = 0.001;
+    S.lineWeights = [];
 
     S.entidades   = struct('nombre',{},'fs',{},'observ',{},'fMin',{},'fMax',{},'ganancia',{});
     S.entActiva   = 0;
     S.treeMap     = {};
     S.entCollapsed = logical([]);   % true = muestras ocultas para esa entidad
 
-    % VRef — referencias de los TIAs
-    S.vdac_p_ref   = 148;    % pVRef: referencia VDAC_p (0x94 default)
-    S.vdac_n_ref   = 148;    % nVRef: referencia VDAC_n
-    S.servo_vdac_p = 148;    % posición actual leída del PSoC
-    S.servo_vdac_n = 148;
-    S.dc_mean_mv   = 0;      % promedio DC actual de la señal (mV)
-    % Configs VRef guardadas por ganancia PGA
-    S.servo_configs = struct('pga_code',{},'p_vref',{},'n_vref',{});
-    S.amux_ch    = 0;   % 0=diferencial, 1=CM positiva, 2=CM negativa
-    S.calRunning = false;
+    % VRef — referencia VDAC única (single-ended)
+    S.vdac_ref     = 148;   % valor VDAC (0x94 default)
+    S.servo_vdac   = 148;   % valor confirmado por PSoC (via heartbeat/ACK)
+    S.vdac_pga_code = 0;    % PGAvdac: 0=1x ... 8=50x
+    S.servo_vdac_pga_code = 0;
+    S.vdac_auto_gain = true;
+    S.vref_target_v = double(S.vdac_ref) * 0.004;
+    S.psoc_tx_mode = 0;     % 0=crudo ADC, 1=salida Filter (comando 0xA8)
+
+    % Pending command — trackeo y retry automatico
+    S.pend_type    = '';    % 'PGA' | 'PGAVDAC' | 'VDAC' | ''
+    S.pend_val     = 0;
+    S.pend_t0      = 0;     % tic del primer envio
+    S.pend_active  = false;
+    S.pend_bytes   = [];    % bytes a retransmitir
+    S.pend_retries = 0;     % intentos realizados (0 = primer envio)
+    S.pend_retry_t = 0;     % tic del ultimo intento
 
     defCom  = 'COM7';
     defBaud = 115200;
@@ -108,21 +133,20 @@ function geophone_scope_simple()
             cfg = load(cfgFile);
             flds = {'fs','maxPoints','tWin','filtCmd','filtB','yRange',...
                     'yMin','yMax','yAuto','tMin','tMax','tAuto','dcRemove','showRaw',...
-                    'vdac_p_ref','vdac_n_ref','amux_ch'};
+                    'lineCancel','lineF0','lineHarmMax','lineMu',...
+                    'vdac_ref','vdac_pga_code','vdac_auto_gain','vref_target_v','psoc_tx_mode'};
             for k = 1:numel(flds)
                 if isfield(cfg,flds{k}), S.(flds{k}) = cfg.(flds{k}); end
+            end
+            if ~isfield(cfg,'vref_target_v')
+                gtbl = [1, 2, 4, 8, 16, 24, 32, 48, 50];
+                ctmp = max(0, min(8, round(double(S.vdac_pga_code))));
+                S.vref_target_v = double(S.vdac_ref) * 0.004 * gtbl(ctmp + 1);
             end
             if isfield(cfg,'com'),       defCom      = cfg.com;       end
             if isfield(cfg,'baud'),      defBaud     = cfg.baud;      end
             if isfield(cfg,'entidades'),    S.entidades    = cfg.entidades;    end
             if isfield(cfg,'entCollapsed'), S.entCollapsed = cfg.entCollapsed; end
-            if isfield(cfg,'servo_configs')
-                sc = cfg.servo_configs;
-                % Descartar formato viejo (tiene p_nominal/n_nominal en vez de p_vref/n_vref)
-                if ~isempty(sc) && isfield(sc(1),'p_vref') && isfield(sc(1),'n_vref')
-                    S.servo_configs = sc;
-                end
-            end
             for ei = 1:numel(S.entidades)
                 if ~isfield(S.entidades(ei),'fMin')
                     bw = 0;
@@ -138,8 +162,8 @@ function geophone_scope_simple()
     % =====================================================================
     % UI — figura 1100 x 1194
     % Layout columna derecha (RX=860, RW=225):
-    %   pConn    y=997 h=116
-    %   pServo   y=883 h=112
+    %   pConn    y=1053 h=116
+    %   pServo   y=913 h=132
     %   pCtrl    y=775 h=106
     %   pFilt    y=649 h=124
     %   pEntidad y=337 h=310
@@ -182,57 +206,59 @@ function geophone_scope_simple()
         'ButtonPushedFcn',@onStreamToggle);
     btnClear = uibutton(pCtrl,'Text','Clear','Position',[106 82 90 28],...
         'ButtonPushedFcn',@onClear);
-    btnShowRaw = uibutton(pCtrl,'Text','Ver crudo','Position',[8 48 88 26],...
+    btnShowRaw = uibutton(pCtrl,'Text','Ver crudo','Position',[8 48 70 26],...
         'ButtonPushedFcn',@(~,~)onToggleRaw());
-    uilabel(pCtrl,'Text','(línea gris --)', ...
-        'Position',[100 50 116 20],'FontSize',8,'FontAngle','italic');
-    uilabel(pCtrl,'Text','Rama:','Position',[8 14 38 18],'FontSize',8);
-    ddMux = uidropdown(pCtrl,...
-        'Items',{'Diferencial','CM Positiva','CM Negativa'},...
-        'Value','Diferencial',...
-        'Position',[48 12 168 22],'FontSize',8,...
-        'ValueChangedFcn',@(~,~)onMuxChanged());
+    btnLineCancel = uibutton(pCtrl,'Text','Cancelar línea','Position',[82 48 86 26],...
+        'FontSize',8,'ButtonPushedFcn',@(~,~)onToggleLineCancel(),...
+        'Tooltip','Cancelador LMS de línea: 50 Hz y armónicos hasta H, limitado por Nyquist');
+    uilabel(pCtrl,'Text','H:','Position',[174 52 12 18],'FontSize',8);
+    edtLineHarm = uieditfield(pCtrl,'numeric','Value',S.lineHarmMax,...
+        'Limits',[1 50],'RoundFractionalValues','on',...
+        'Position',[188 50 28 22],'FontSize',8,...
+        'ValueChangedFcn',@(~,~)onLineHarmChanged());
+    btnTxMode = uibutton(pCtrl,'Text','PSoC: Crudo','Position',[8 12 86 22],...
+        'FontSize',8,'BackgroundColor',CLR_OFF,'FontColor',[0 0 0],...
+        'Tooltip','Alterna entre dato crudo ADC y salida del Filter DFB en el PSoC',...
+        'ButtonPushedFcn',@(~,~)onToggleTxMode());
+    uilabel(pCtrl,'Text','fs:','Position',[100 14 20 18],'FontSize',8);
+    edtFs = uieditfield(pCtrl,'text','Value',num2str(S.fs),...
+        'Position',[122 12 58 22],'FontSize',8,...
+        'ValueChangedFcn',@(~,~)onFsChanged());
+    uilabel(pCtrl,'Text','Hz','Position',[184 14 24 18],'FontSize',8);
 
     % --- VRef DC ---
-    pServo = uipanel(fig,'Title','VRef DC','Position',[RX 913 RW 138]);
-    % Fila 1: pVRef y nVRef + Aplicar
-    uilabel(pServo,'Text','pVRef:','Position',[4 96 36 18],'FontSize',8);
-    edtPVRef = uieditfield(pServo,'numeric','Value',S.vdac_p_ref,...
-        'Limits',[0 255],'RoundFractionalValues','on',...
-        'Position',[42 94 36 22],'FontSize',8);
-    uilabel(pServo,'Text','nVRef:','Position',[82 96 36 18],'FontSize',8);
-    edtNVRef = uieditfield(pServo,'numeric','Value',S.vdac_n_ref,...
-        'Limits',[0 255],'RoundFractionalValues','on',...
-        'Position',[120 94 36 22],'FontSize',8);
-    btnApplyServo = uibutton(pServo,'Text','Aplicar','Position',[160 94 58 22],...
+    pServo = uipanel(fig,'Title','VRef DC','Position',[RX 913 RW 132]);
+    uilabel(pServo,'Text','Vref:','Position',[6 84 36 18],'FontSize',8);
+    edtVRef = uieditfield(pServo,'numeric','Value',S.vref_target_v,...
+        'Limits',[0 51],'ValueDisplayFormat','%.3f',...
+        'Position',[44 82 62 22],'FontSize',8,...
+        'ValueChangedFcn',@(~,~)onVdacUiChanged());
+    uilabel(pServo,'Text','V','Position',[110 84 12 18],'FontSize',8);
+    chkVdacAuto = uicheckbox(pServo,'Text','Auto','Value',S.vdac_auto_gain,...
+        'Position',[126 84 48 18],'FontSize',8,...
+        'ValueChangedFcn',@(~,~)onVdacUiChanged());
+    btnApplyServo = uibutton(pServo,'Text','OK','Position',[176 80 42 26],...
         'FontSize',8,'BackgroundColor',CLR_ON,'FontColor',[0 0 0],...
         'ButtonPushedFcn',@(~,~)onApplyServo());
-    % Fila 2: Guardar y Editar
-    btnGuardarCfg = uibutton(pServo,'Text','Guardar cfg PGA','Position',[4 70 108 22],...
-        'FontSize',8,'BackgroundColor',CLR_ON,'FontColor',[0 0 0],...
-        'Tooltip','Guarda pVRef/nVRef actual como preset para la ganancia PGA activa',...
-        'ButtonPushedFcn',@(~,~)onGuardarCfgPGA());
-    btnEditarCfg = uibutton(pServo,'Text','Editar cfg','Position',[118 70 100 22],...
-        'FontSize',8,'Tooltip','Ver/editar presets por ganancia PGA',...
-        'ButtonPushedFcn',@(~,~)onEditarCfgs());
-    % Fila 3: AutoCal
-    btnAutoCal = uibutton(pServo,'Text','AutoCal p+n','Position',[4 46 100 22],...
-        'FontSize',8,'BackgroundColor',[0.85 0.65 0.10],'FontColor',[0 0 0],...
-        'FontWeight','bold',...
-        'Tooltip','Calibra pVRef (CM+) y nVRef (CM-) automaticamente: va a CM+, calibra, va a CM-, calibra, vuelve a Diferencial.',...
-        'ButtonPushedFcn',@(~,~)onAutoCalibrateVRef());
-    lblCalSt = uilabel(pServo,'Text','CM+→CM-→Dif',...
-        'Position',[108 48 114 18],'FontSize',7.5,'FontAngle','italic');
-    % Fila 4: estado actual + promedio DC
-    uilabel(pServo,'Text','VDp:','Position',[4 20 26 18],'FontSize',8);
-    lblVdacP = uilabel(pServo,'Text','---','Position',[32 20 26 18],...
-        'FontSize',8,'FontWeight','bold');
-    uilabel(pServo,'Text','VDn:','Position',[62 20 26 18],'FontSize',8);
-    lblVdacN = uilabel(pServo,'Text','---','Position',[90 20 26 18],...
-        'FontSize',8,'FontWeight','bold');
-    uilabel(pServo,'Text','DC:','Position',[120 20 20 18],'FontSize',8);
-    lblDCMean = uilabel(pServo,'Text','0.0 mV','Position',[142 20 80 18],...
-        'FontSize',8,'FontWeight','bold');
+    uilabel(pServo,'Text','PGA:','Position',[6 54 32 18],'FontSize',8);
+    ddVdacPGA = uidropdown(pServo,'Items',pgaGainItems(),...
+        'Value',num2str(pgaCodeToGain(S.vdac_pga_code)),...
+        'Position',[44 52 62 22],'FontSize',8,...
+        'ValueChangedFcn',@(~,~)onVdacUiChanged());
+    uilabel(pServo,'Text','VDAC:','Position',[112 54 34 18],'FontSize',8);
+    lblVdacCalc = uilabel(pServo,'Text','0x00 (0)',...
+        'Position',[148 54 74 18],'FontSize',8,'FontWeight','bold');
+    uilabel(pServo,'Text','DAC:','Position',[6 28 32 18],'FontSize',8);
+    lblVdacDac = uilabel(pServo,'Text','0.000 V',...
+        'Position',[44 28 76 18],'FontSize',8);
+    uilabel(pServo,'Text','Out:','Position',[126 28 28 18],'FontSize',8);
+    lblVdacOut = uilabel(pServo,'Text','0.000 V',...
+        'Position',[154 28 66 18],'FontSize',8);
+    uilabel(pServo,'Text','PSoC:','Position',[6 6 36 18],'FontSize',8);
+    lblVdac = uilabel(pServo,'Text',sprintf('0x%02X (%d)',S.servo_vdac,S.servo_vdac),...
+        'Position',[44 6 78 18],'FontSize',8,'FontWeight','bold');
+    lblVdacPga = uilabel(pServo,'Text',sprintf('PGA %dx',pgaCodeToGain(S.servo_vdac_pga_code)),...
+        'Position',[126 6 92 18],'FontSize',8,'FontWeight','bold');
 
     % --- Filtro FIR + DC ---
     pFilt = uipanel(fig,'Title','Filtro FIR MATLAB','Position',[RX 649 RW 124]);
@@ -342,10 +368,14 @@ function geophone_scope_simple()
     updateZoomBtns();
     updateDCBtn();
     updateShowRawBtn();
+    updateLineCancelBtn();
     updateBtnStates();
-    updateServoDisplay();
-    if S.amux_ch <= 2, ddMux.Value = ddMux.Items{S.amux_ch + 1}; end
-    updateVRefEnableState();
+    syncFsUi();
+    updateInfo();
+    edtVRef.Value = double(S.vref_target_v);
+    chkVdacAuto.Value = logical(S.vdac_auto_gain);
+    ddVdacPGA.Value = num2str(pgaCodeToGain(S.vdac_pga_code));
+    updateVdacCalcDisplay();
     refreshTree();
     if ~S.tAuto, try ax1.XLim=[S.tMin S.tMax]; catch, end; end
     if ~S.yAuto, try ax1.YLim=[S.yMin S.yMax]; catch, end; end
@@ -367,6 +397,67 @@ function geophone_scope_simple()
     function s = pgaGainStr(code)
         s = sprintf('%dx (0x%02X)', pgaCodeToGain(code), round(double(code)));
     end
+    function items = pgaGainItems()
+        items = {'1','2','4','8','16','24','32','48','50'};
+    end
+
+    function [code,gain,byte,vdac_v,out_v,clamped] = calcVdacSetting(target_v, forcedCode)
+        gains = [1, 2, 4, 8, 16, 24, 32, 48, 50];
+        target_v = double(target_v);
+        if ~isfinite(target_v), target_v = 0; end
+        target_v = max(0, target_v);
+
+        if nargin < 2 || isempty(forcedCode)
+            code = 8;
+            for kk = 1:numel(gains)
+                if target_v / gains(kk) <= 1.020 + eps
+                    code = kk - 1;
+                    break;
+                end
+            end
+        else
+            code = max(0, min(8, round(double(forcedCode))));
+        end
+
+        gain = gains(code + 1);
+        dac_target = target_v / gain;
+        byte = round(dac_target / 0.004);
+        clamped = byte < 0 || byte > 255 || dac_target > 1.020;
+        byte = max(0, min(255, byte));
+        vdac_v = byte * 0.004;
+        out_v = vdac_v * gain;
+    end
+
+    function [code,gain,byte,vdac_v,out_v,clamped] = currentVdacSetting()
+        if logical(chkVdacAuto.Value)
+            [code,gain,byte,vdac_v,out_v,clamped] = calcVdacSetting(edtVRef.Value, []);
+        else
+            forcedCode = pgaGainToCode(str2double(ddVdacPGA.Value));
+            [code,gain,byte,vdac_v,out_v,clamped] = calcVdacSetting(edtVRef.Value, forcedCode);
+        end
+    end
+
+    function onVdacUiChanged()
+        updateVdacCalcDisplay();
+    end
+
+    function updateVdacCalcDisplay()
+        [~,gain,byte,vdac_v,out_v,clamped] = currentVdacSetting();
+        if logical(chkVdacAuto.Value)
+            ddVdacPGA.Value = num2str(gain);
+        end
+        ddVdacPGA.Enable = S.isConnected && ~logical(chkVdacAuto.Value);
+        lblVdacCalc.Text = sprintf('0x%02X (%d)', byte, byte);
+        lblVdacDac.Text  = sprintf('%.3f V', vdac_v);
+        lblVdacOut.Text  = sprintf('%.3f V', out_v);
+        lblVdac.Text     = sprintf('0x%02X (%d)', S.servo_vdac, S.servo_vdac);
+        lblVdacPga.Text  = sprintf('PGA %dx', pgaCodeToGain(S.servo_vdac_pga_code));
+        if clamped
+            lblVdacOut.FontColor = [0.85 0.15 0.15];
+        else
+            lblVdacOut.FontColor = [0 0 0];
+        end
+    end
 
     function s = filtStatusStr()
         if isempty(S.filtB), s='Sin filtro activo';
@@ -380,6 +471,131 @@ function geophone_scope_simple()
     end
     function s = safeFilename(nombre)
         s = regexprep(nombre,'[^\w]','_');
+    end
+
+    function s = fsToText(fsVal)
+        if ~isfinite(fsVal) || fsVal <= 0
+            s = '0';
+        elseif abs(fsVal - round(fsVal)) < 1e-9
+            s = sprintf('%.0f', fsVal);
+        else
+            s = sprintf('%.6g', fsVal);
+        end
+    end
+
+    function syncFsUi()
+        try
+            edtFs.Value = fsToText(S.fs);
+        catch
+        end
+    end
+
+    function [scale,unit,fmt] = timeUnitForMs(refMs)
+        refMs = abs(double(refMs));
+        if ~isfinite(refMs), refMs = 0; end
+        if refMs < 1000
+            scale = 1; unit = 'ms'; fmt = '%.0f';
+        elseif refMs < 60000
+            scale = 1000; unit = 's';
+            if refMs < 10000, fmt = '%.2f'; else, fmt = '%.1f'; end
+        elseif refMs < 3600000
+            scale = 60000; unit = 'min';
+            if refMs < 600000, fmt = '%.2f'; else, fmt = '%.1f'; end
+        else
+            scale = 3600000; unit = 'h';
+            if refMs < 36000000, fmt = '%.2f'; else, fmt = '%.1f'; end
+        end
+    end
+
+    function s = formatTimeMs(tMs)
+        [scale,unit,~] = timeUnitForMs(tMs);
+        val = double(tMs) / scale;
+        if strcmp(unit,'ms')
+            s = sprintf('%.0f ms', val);
+        elseif abs(val) < 10
+            s = sprintf('%.2f %s', val, unit);
+        elseif abs(val) < 100
+            s = sprintf('%.1f %s', val, unit);
+        else
+            s = sprintf('%.0f %s', val, unit);
+        end
+    end
+
+    function updateTimeAxisUnits()
+        try
+            xl = ax1.XLim;
+            refMs = max(abs(double(xl)));
+            [scale,unit,fmt] = timeUnitForMs(refMs);
+            ticks = ax1.XTick;
+            ax1.XTickLabel = cellstr(compose(fmt, ticks ./ scale));
+            xlabel(ax1, sprintf('tiempo (%s)', unit));
+        catch
+        end
+    end
+
+    function resetLineCanceller()
+        S.lineWeights = [];
+    end
+
+    function hUse = activeLineHarmonics()
+        fsVal = double(S.fs);
+        f0Val = double(S.lineF0);
+        hReq = max(1, round(double(S.lineHarmMax)));
+        if ~isfinite(fsVal) || fsVal <= 0 || ~isfinite(f0Val) || f0Val <= 0
+            hUse = 0;
+            return;
+        end
+        hNyq = floor((fsVal/2 - 1e-9) / f0Val);
+        hUse = max(0, min(hReq, hNyq));
+    end
+
+    function y = applyLineCanceller(x, nIdx)
+        y = double(x(:));
+        if ~S.lineCancel || isempty(y)
+            return;
+        end
+
+        hUse = activeLineHarmonics();
+        if hUse < 1
+            return;
+        end
+
+        L = 2 * hUse;
+        if numel(S.lineWeights) ~= L
+            S.lineWeights = zeros(L, 1);
+        end
+
+        fsVal = double(S.fs);
+        f0Val = double(S.lineF0);
+        mu = double(S.lineMu);
+        if ~isfinite(mu) || mu <= 0, mu = 0.001; end
+        mu = min(mu, 0.1);
+
+        harmonics = (1:hUse).';
+        w = double(S.lineWeights(:));
+        n0 = double(nIdx(:)) - 1;
+        if numel(n0) ~= numel(y)
+            n0 = (0:numel(y)-1).';
+        end
+
+        for ii = 1:numel(y)
+            phase = 2*pi*f0Val*n0(ii)/fsVal;
+            ref = zeros(L, 1);
+            ref(1:2:end) = sin(harmonics * phase);
+            ref(2:2:end) = cos(harmonics * phase);
+            noiseEst = w.' * ref;
+            err = y(ii) - noiseEst;
+            w = w + mu * ref * err;
+            y(ii) = err;
+        end
+
+        S.lineWeights = w;
+    end
+
+    function bytes = psocCmd(cmd, param)
+        cmd = uint8(cmd);
+        param = uint8(param);
+        bytes = [uint8(0xAB), cmd, param, bitxor(cmd, param)];
     end
 
     function setBtn(btn, active)
@@ -422,6 +638,19 @@ function geophone_scope_simple()
         hRaw.Visible = S.showRaw;
     end
 
+    function updateLineCancelBtn()
+        if S.lineCancel
+            btnLineCancel.Text='Línea ON';
+            btnLineCancel.BackgroundColor=CLR_ON; btnLineCancel.FontColor=[0 0 0];
+            btnLineCancel.FontWeight='bold';
+        else
+            btnLineCancel.Text='Cancelar línea';
+            btnLineCancel.BackgroundColor=CLR_OFF; btnLineCancel.FontColor=[0 0 0];
+            btnLineCancel.FontWeight='normal';
+        end
+        try, edtLineHarm.Value = max(1, min(50, round(double(S.lineHarmMax)))); catch, end
+    end
+
     function updateBtnStates()
         c=S.isConnected; r=S.streamEnabled;
         edtCom.Enable=~c; edtBaud.Enable=~c;
@@ -430,13 +659,20 @@ function geophone_scope_simple()
         if r, btnStream.Text='STOP'; btnStream.BackgroundColor=CLR_STOP; btnStream.FontColor=[1 1 1];
         else, btnStream.Text='START';btnStream.BackgroundColor=CLR_START;btnStream.FontColor=[0 0 0]; end
         btnStream.Enable = c;
+        edtFs.Enable = true;
+        btnLineCancel.Enable = true;
+        edtLineHarm.Enable = true;
         tieneEnt  = S.entActiva>=1 && S.entActiva<=numel(S.entidades);
         tieneDatos= ~isempty(S.nVec);
         btnGuardar.Enable = tieneEnt && tieneDatos && ~r;
         ddPGA.Enable     = c;
         btnSetPGA.Enable = c;
-        edtMaxPts.Enable = ~r;
-        updateVRefEnableState();
+        edtMaxPts.Enable  = ~r;
+        edtVRef.Enable    = c;
+        chkVdacAuto.Enable = c;
+        ddVdacPGA.Enable = c && ~logical(chkVdacAuto.Value);
+        btnApplyServo.Enable = c;
+        btnTxMode.Enable  = c;
     end
 
     function logMsg(msg)
@@ -456,18 +692,89 @@ function geophone_scope_simple()
         end
     end
     function logHex(raw)
-        if S.logFid<=0, return; end
-        n=min(numel(raw),40); h=sprintf('%02X ',raw(1:n));
-        if numel(raw)>40, h=[h '...']; end
-        fprintf(S.logFid,'  RAW[%d]: %s\n',numel(raw),h);
+        if S.logFid<=0||isempty(raw), return; end
+        h = sprintf('%02X ', raw(:));
+        fprintf(S.logFid,'  RX[%d]: %s\n', numel(raw), strtrim(h));
+    end
+    function logTX(bytes, desc)
+        if S.logFid>0
+            h  = sprintf('%02X ', bytes);
+            ts = datestr(now,'HH:MM:SS.FFF');
+            fprintf(S.logFid,'[%s] TX [%s]  %s\n', ts, strtrim(h), char(desc));
+        end
     end
     function logParsed(np)
         if S.logFid<=0||np==0, return; end
-        fprintf(S.logFid,'  PARSED: %d\n',np);
+        fprintf(S.logFid,'  PARSED: %d samples  frames=%d  junk=%d  badType=%d\n',...
+            np, S.rxFrames, S.rxJunkBytes, S.rxBadTypes);
+    end
+
+    % ---------- Tracking de confirmaciones PSoC con retry automatico ----------
+    function setPending(tipo, val, bytes)
+        if nargin < 3
+            bytes = uint8([]);
+        end
+        S.pend_type    = tipo;
+        S.pend_val     = val;
+        S.pend_t0      = tic;
+        S.pend_active  = true;
+        S.pend_bytes   = bytes;
+        S.pend_retries = 0;
+        S.pend_retry_t = tic;
+        if S.logFid>0
+            h = sprintf('%02X ', bytes);
+            fprintf(S.logFid,'[%s] TX#1 [%s]  %s=%d\n',...
+                datestr(now,'HH:MM:SS.FFF'), strtrim(h), tipo, val);
+        end
+    end
+
+    function checkPending(src, confirmed_val)
+        if ~S.pend_active, return; end
+        if ~isa(S.pend_t0,'uint64') || ~isa(S.pend_retry_t,'uint64')
+            S.pend_t0 = tic;
+            S.pend_retry_t = S.pend_t0;
+            return;
+        end
+        elapsed = toc(S.pend_t0);
+        matched = strcmp(src, S.pend_type) && (confirmed_val == S.pend_val);
+        if matched
+            msg = sprintf('OK PSoC confirmo %s=%d en %.2fs (intento %d)',...
+                S.pend_type, S.pend_val, elapsed, S.pend_retries+1);
+            logMsg(msg);
+            if S.logFid>0, fprintf(S.logFid,'[%s] CONF: %s\n',datestr(now,'HH:MM:SS.FFF'),char(msg)); end
+            S.pend_active = false;
+        elseif toc(S.pend_retry_t) > 0.5 && S.pend_retries < 5
+            % Reenviar cada 500ms, hasta 5 reintentos
+            S.pend_retries = S.pend_retries + 1;
+            S.pend_retry_t = tic;
+            if ~isempty(S.pend_bytes) && S.isConnected
+                try
+                    write(S.sp, S.pend_bytes, 'uint8');
+                    msg = sprintf('RETRY %d/5  %s=%d', S.pend_retries, S.pend_type, S.pend_val);
+                    logMsg(msg);
+                    if S.logFid>0
+                        h = sprintf('%02X ', S.pend_bytes);
+                        fprintf(S.logFid,'[%s] TX#%d [%s]  %s\n',...
+                            datestr(now,'HH:MM:SS.FFF'), S.pend_retries+1, strtrim(h), char(msg));
+                    end
+                catch
+                end
+            end
+        elseif elapsed > 6.0 && S.pend_retries >= 5
+            msg = sprintf('FAIL: PSoC no respondio %s=%d tras 5 intentos — verificar UART RX en PSoC Creator',...
+                S.pend_type, S.pend_val);
+            logMsg(msg);
+            if S.logFid>0, fprintf(S.logFid,'[%s] FAIL: %s\n',datestr(now,'HH:MM:SS.FFF'),char(msg)); end
+            S.pend_active = false;
+        end
     end
     function updateInfo()
         try, n=numel(S.nVec);
-            lblInfo.Text=sprintf('n=%d  t=%.0f ms',n,n/S.fs*1000);
+            if isfinite(S.fs) && S.fs > 0
+                lblInfo.Text=sprintf('n=%d  t=%s',n,formatTimeMs(n/S.fs*1000));
+            else
+                lblInfo.Text=sprintf('n=%d  t=--',n);
+            end
         catch, end
     end
     function applyFilter()
@@ -475,19 +782,24 @@ function geophone_scope_simple()
         if isempty(S.notchVec), S.filtVec=zeros(0,1); return; end
         raw_mV = S.notchVec * S.scale;
         if isempty(S.filtB)
-            S.filtVec = raw_mV;
+            processed = raw_mV;
         else
             minLen = 3*(numel(S.filtB)-1);
             if numel(raw_mV) < max(minLen,4)
-                S.filtVec = raw_mV;
+                processed = raw_mV;
             else
                 try
-                    [S.filtVec, S.filtZi] = filter(S.filtB, 1, raw_mV);
+                    [processed, S.filtZi] = filter(S.filtB, 1, raw_mV);
                 catch
-                    S.filtVec = raw_mV;
+                    processed = raw_mV;
                 end
             end
         end
+        if S.lineCancel
+            resetLineCanceller();
+            processed = applyLineCanceller(processed, S.nVec);
+        end
+        S.filtVec = processed;
     end
 
     function appendSamples(newNotch)
@@ -508,6 +820,9 @@ function geophone_scope_simple()
             end
             [newFilt, S.filtZi] = filter(S.filtB, 1, raw_new, S.filtZi);
         end
+        if S.lineCancel
+            newFilt = applyLineCanceller(newFilt, nIdx);
+        end
         S.filtVec = [S.filtVec; newFilt];
 
         if numel(S.nVec) > S.maxPoints
@@ -520,6 +835,7 @@ function geophone_scope_simple()
 
     function replot()
         if isempty(S.nVec)||isempty(S.filtVec), return; end
+        if ~isfinite(S.fs) || S.fs <= 0, return; end
         tms    = double(S.nVec)/S.fs*1000.0;
         raw_mV = S.notchVec*S.scale;
         filt   = S.filtVec;
@@ -529,9 +845,7 @@ function geophone_scope_simple()
         % Línea de promedio DC (naranja punteada) + etiqueta en panel
         if ~isempty(filt)
             dcMean = mean(filt);
-            S.dc_mean_mv = dcMean;
             set(hDCLine, 'XData', [tms(1) tms(end)], 'YData', [dcMean dcMean]);
-            try, lblDCMean.Text = sprintf('%.1f mV', dcMean); catch, end
         end
         if ~S.tAuto
             try, ax1.XLim=[S.tMin S.tMax]; catch, end
@@ -542,13 +856,21 @@ function geophone_scope_simple()
         if ~S.yAuto
             try, ax1.YLim=[S.yMin S.yMax]; catch, end
         else
-            peak=max(abs(filt)); if peak<0.1, peak=0.1; end
-            target=peak*1.25;
-            if target>S.yRange, S.yRange=target;
-            else, S.yRange=S.yRange*0.97+target*0.03; end
-            S.yRange=max(S.yRange,1.0);
+            % Usar percentil 2-98 para ignorar spikes de ruido UART
+            if numel(filt) >= 20
+                pcts = prctile(filt, [2 98]);
+                peak = max(abs(pcts));
+            else
+                peak = max(abs(filt));
+            end
+            if peak < 0.1, peak = 0.1; end
+            target = peak * 1.5;
+            if target > S.yRange, S.yRange = target;
+            else, S.yRange = S.yRange*0.97 + target*0.03; end
+            S.yRange = max(S.yRange, 1.0);
             try, ax1.YLim=[-S.yRange S.yRange]; catch, end
         end
+        updateTimeAxisUnits();
     end
     function saveConfig()
         try
@@ -558,9 +880,11 @@ function geophone_scope_simple()
             cfg.yMin=S.yMin; cfg.yMax=S.yMax; cfg.yAuto=S.yAuto;
             cfg.tMin=S.tMin; cfg.tMax=S.tMax; cfg.tAuto=S.tAuto;
             cfg.dcRemove=S.dcRemove; cfg.showRaw=S.showRaw;
-            cfg.vdac_p_ref=S.vdac_p_ref; cfg.vdac_n_ref=S.vdac_n_ref;
-            cfg.amux_ch=S.amux_ch;
-            cfg.servo_configs=S.servo_configs;
+            cfg.lineCancel=S.lineCancel; cfg.lineF0=S.lineF0;
+            cfg.lineHarmMax=S.lineHarmMax; cfg.lineMu=S.lineMu;
+            cfg.vdac_ref=S.vdac_ref; cfg.vdac_pga_code=S.vdac_pga_code;
+            cfg.vdac_auto_gain=S.vdac_auto_gain; cfg.vref_target_v=S.vref_target_v;
+            cfg.psoc_tx_mode=S.psoc_tx_mode;
             cfg.entCollapsed=S.entCollapsed;
             cfg.entidades=S.entidades;
             save(cfgFile,'-struct','cfg');
@@ -678,9 +1002,15 @@ function geophone_scope_simple()
         if strcmp(tm.tipo,'vacio'), return; end
 
         oldActiva=S.entActiva;
+        oldFs = S.fs;
         S.entActiva=tm.entIdx;
         if S.entActiva>=1&&S.entActiva<=numel(S.entidades)
             S.fs=S.entidades(S.entActiva).fs;
+            syncFsUi();
+            if oldFs ~= S.fs
+                resetLineCanceller();
+                applyFilter();
+            end
         end
 
         if oldActiva~=S.entActiva
@@ -694,7 +1024,7 @@ function geophone_scope_simple()
         else
             actualizarLblEntActiva();
         end
-        updateBtnStates();
+        replot(); updateInfo(); updateBtnStates();
     end
 
     % =====================================================================
@@ -773,6 +1103,14 @@ function geophone_scope_simple()
                     end
                 end
                 S.entidades(entIdx)=nueva;
+                if S.entActiva == entIdx
+                    S.fs = nueva.fs;
+                    syncFsUi();
+                    resetLineCanceller();
+                    applyFilter();
+                    replot();
+                    updateInfo();
+                end
                 logMsg(sprintf('Entidad editada: %s (antes: %s)', nombre, nombreViejo));
             else
                 if isempty(S.entidades)
@@ -782,6 +1120,8 @@ function geophone_scope_simple()
                 end
                 S.entActiva=numel(S.entidades);
                 S.fs=nueva.fs;
+                syncFsUi();
+                resetLineCanceller();
                 logMsg(sprintf('Entidad creada: %s (fs=%g, %g-%g Hz, G=%g)',...
                     nombre,nueva.fs,nueva.fMin,nueva.fMax,nueva.ganancia));
             end
@@ -935,88 +1275,82 @@ function geophone_scope_simple()
 
     function onSetPGA()
         gain = str2double(ddPGA.Value);
-        if ~isfinite(gain), logMsg('PGA: valor inválido'); return; end
+        if ~isfinite(gain), return; end
         code = pgaGainToCode(gain);
         if ~S.isConnected, logMsg('PGA: no conectado'); return; end
-
-        wasRunning = ~isempty(S.streamTimer) && isvalid(S.streamTimer) && ...
-                     strcmp(S.streamTimer.Running, 'on');
-        if wasRunning, stopStreamTimer(); end
-
-        try, flush(S.sp); catch, end
-
+        bytes = psocCmd(0xA6, code);
         try
-            write(S.sp, uint8([0xA6, uint8(code)]), 'uint8');
+            write(S.sp, bytes, 'uint8');
         catch ex
-            logMsg('PGA: error UART — ' + string(ex.message));
-            if wasRunning, startStreamTimer(); end
-            return;
+            logMsg('PGA: error UART — ' + string(ex.message)); return;
         end
-        logMsg(sprintf('PGA cmd enviado: %dx (code 0x%02X) — esperando confirmación...', gain, code));
-
-        t0   = tic;
-        vBuf = uint8([]);
-        confirmed = false;
-        while toc(t0) < 1.0 && ~confirmed
-            pause(0.02);
-            try
-                n = S.sp.NumBytesAvailable;
-                if n > 0
-                    vBuf = [vBuf; read(S.sp, n, 'uint8')]; %#ok<AGROW>
-                end
-            catch ex2
-                logMsg('PGA: error leyendo confirmación — ' + string(ex2.message));
-                break;
-            end
-            while numel(vBuf) >= 5
-                idx = find(vBuf == uint8(0x56), 1);
-                if isempty(idx), vBuf = uint8([]); break; end
-                vBuf = vBuf(idx:end);
-                if numel(vBuf) < 5, break; end
-                p    = double(vBuf(1:5));
-                vBuf = vBuf(6:end);
-                if p(2) == 3  % CFG_PGA — p(3) = pga_code
-                    confirmedCode = p(3);
-                    if confirmedCode == code
-                        confirmed = true; break;
-                    else
-                        logMsg(sprintf('PGA: PSoC reporta 0x%02X (esperado 0x%02X)', confirmedCode, code));
-                    end
-                elseif p(2) == 4  % VREF_STATUS
-                    S.servo_vdac_p = p(3);
-                    S.servo_vdac_n = p(4);
-                    updateServoDisplay();
-                end
-            end
-        end
-
-        if confirmed
-            S.pga_gain_code = code;
-            lblPGAGain.Text = pgaGainStr(code);
-            lblCfgInfo.Text = sprintf('ADC:%db  fs:%d SPS  PGA:%s  ±%dmV',...
-                S.adc_bits, S.fs, pgaGainStr(code), S.vref_halfmv);
-            logMsg(sprintf('PGA confirmado: %dx (0x%02X)', pgaCodeToGain(code), code));
-            saveConfig();
-            % Auto-cargar config servo para esta ganancia si existe
-            cfgIdx = findServoCfgByCode(code);
-            if ~isempty(cfgIdx)
-                c = S.servo_configs(cfgIdx);
-                edtPVRef.Value = double(c.p_vref);
-                edtNVRef.Value = double(c.n_vref);
-                onApplyServo();
-                logMsg(sprintf('Servo cfg PGA %dx cargada automáticamente', pgaCodeToGain(code)));
-            end
-        else
-            logMsg('PGA WARN: sin confirmación del PSoC — verifica la conexión');
-        end
-
-        S.rxBuf = uint8([]);
-        if wasRunning, startStreamTimer(); end
+        logMsg(sprintf('TX→PSoC  [AB A6 %02X %02X]  PGA=%dx  (retry auto hasta 5x)',uint8(code),bytes(4),gain));
+        S.pga_gain_code = code;
+        lblPGAGain.Text = pgaGainStr(code);
+        lblCfgInfo.Text = sprintf('ADC:%db  fs:%d SPS  PGA:%s  ±%dmV',...
+            S.adc_bits, S.fs, pgaGainStr(code), S.vref_halfmv);
+        setPending('PGA', code, bytes);
+        saveConfig();
     end
 
     % =====================================================================
     % Callbacks de configuración
     % =====================================================================
+    function onToggleLineCancel()
+        S.lineCancel = ~logical(S.lineCancel);
+        resetLineCanceller();
+        applyFilter();
+        replot();
+        updateInfo();
+        updateLineCancelBtn();
+        saveConfig();
+        hUse = activeLineHarmonics();
+        if S.lineCancel
+            logMsg(sprintf('Cancelador línea ON: f0=%g Hz, armónicos usados=%d/%d, mu=%g',...
+                S.lineF0, hUse, S.lineHarmMax, S.lineMu));
+            if hUse < S.lineHarmMax
+                logMsg('Cancelador línea: algunos armónicos quedaron fuera por Nyquist/fs');
+            end
+        else
+            logMsg('Cancelador línea OFF');
+        end
+    end
+
+    function onLineHarmChanged()
+        hReq = round(double(edtLineHarm.Value));
+        if ~isfinite(hReq) || hReq < 1, hReq = 1; end
+        S.lineHarmMax = max(1, min(50, hReq));
+        resetLineCanceller();
+        applyFilter();
+        replot();
+        updateInfo();
+        updateLineCancelBtn();
+        saveConfig();
+        logMsg(sprintf('Cancelador línea: hasta armónico %d', S.lineHarmMax));
+    end
+
+    function onFsChanged()
+        raw = strrep(strtrim(char(edtFs.Value)), ',', '.');
+        fsNew = str2double(raw);
+        if ~isfinite(fsNew) || fsNew <= 0
+            logMsg('fs inválida: ingresa una frecuencia positiva en Hz/SPS');
+            syncFsUi();
+            return;
+        end
+        S.fs = fsNew;
+        resetLineCanceller();
+        if S.entActiva>=1 && S.entActiva<=numel(S.entidades)
+            S.entidades(S.entActiva).fs = fsNew;
+            actualizarLblEntActiva();
+        end
+        syncFsUi();
+        applyFilter();
+        replot();
+        updateInfo();
+        saveConfig();
+        logMsg(sprintf('fs actualizada: %s Hz', fsToText(S.fs)));
+    end
+
     function onTWinChanged()
         v=double(edtTWin.Value);
         if isfinite(v)&&v>=0, S.tWin=v; replot(); saveConfig(); end
@@ -1101,30 +1435,24 @@ function geophone_scope_simple()
     % Handshake de configuracion con PSoC
     % =====================================================================
     function requestAndParseConfig()
-        logMsg('Solicitando config al PSoC (0xA5)...');
+        logMsg('Solicitando config al PSoC...');
         try
             flush(S.sp);
-            write(S.sp, uint8(0xA5), 'uint8');
+            write(S.sp, psocCmd(0xA5, 0), 'uint8');
         catch
             logMsg('WARN: no se pudo enviar solicitud de config');
             return;
         end
 
-        t0 = tic;
-        cfgBuf   = uint8([]);
-        gotType2 = false;
-        gotType3 = false;
-        gotType4 = false;
-        gotType6 = false;
-        gotAmux  = false;
+        t0 = tic; cfgBuf = uint8([]);
+        gotType2 = false; gotType3 = false;
 
-        while toc(t0) < 2.0 && (~gotType2 || ~gotType3 || ~gotType4 || ~gotType6)
+        while toc(t0) < 2.0 && (~gotType2 || ~gotType3)
             pause(0.05);
             try
                 n = S.sp.NumBytesAvailable;
                 if n > 0
-                    raw = read(S.sp, n, 'uint8');
-                    cfgBuf = [cfgBuf; raw(:)]; %#ok<AGROW>
+                    cfgBuf = [cfgBuf; reshape(read(S.sp, n, 'uint8'), [], 1)]; %#ok<AGROW>
                 end
             catch, break; end
 
@@ -1135,67 +1463,50 @@ function geophone_scope_simple()
                 if numel(cfgBuf) < 5, break; end
                 p      = double(cfgBuf(1:5));
                 cfgBuf = cfgBuf(6:end);
-                if p(2) == 2
-                    S.adc_bits = p(3);
-                    S.fs       = p(4)*256 + p(5);
-                    gotType2   = true;
-                elseif p(2) == 3
-                    S.pga_gain_code = p(3);
-                    S.vref_halfmv   = p(4)*256 + p(5);
-                    gotType3        = true;
-                elseif p(2) == 4
-                    S.servo_vdac_p = p(3);
-                    S.servo_vdac_n = p(4);
-                    gotType4       = true;
-                elseif p(2) == 5  % AMUX_STATUS
-                    S.amux_ch = p(3);
-                    gotAmux   = true;
-                elseif p(2) == 6
-                    S.vdac_p_ref = p(3);
-                    S.vdac_n_ref = p(4);
-                    gotType6     = true;
+                switch p(2)
+                    case 2
+                        S.adc_bits = p(3);
+                        S.fs       = p(4)*256 + p(5);
+                        syncFsUi();
+                        resetLineCanceller();
+                        gotType2   = true;
+                    case 3
+                        S.pga_gain_code = p(3);
+                        S.vref_halfmv   = p(4)*256 + p(5);
+                        gotType3        = true;
+                    case 4
+                        if p(3) <= 8
+                            S.servo_vdac_pga_code = p(3);
+                            S.vdac_pga_code = p(3);
+                            S.servo_vdac = p(4);
+                            S.vdac_ref = p(4);
+                            updateVdacCalcDisplay();
+                        end
+                    % tipos 5/6 ignorados (firmware viejo) — no crash
                 end
             end
         end
 
         if gotType2 && gotType3
-            if     S.adc_bits <= 8,  S.pktDataBytes = 1;
-            elseif S.adc_bits <= 16, S.pktDataBytes = 2;
-            else,                    S.pktDataBytes = 3;
-            end
-            S.pktTotalBytes = 2 + S.pktDataBytes;
-            S.scale = (S.vref_halfmv * 2) / 2^24;
-
+            S.pktDataBytes = 3;
+            S.pktTotalBytes = 5;
+            S.scale = S.vref_halfmv / 2^(S.adc_bits - 1);
+            syncFsUi();
             ddPGA.Value     = num2str(pgaCodeToGain(S.pga_gain_code));
             lblPGAGain.Text = pgaGainStr(S.pga_gain_code);
+            updateVdacCalcDisplay();
             lblCfgInfo.Text = sprintf('ADC:%db  fs:%d SPS  PGA:%s  ±%dmV',...
                 S.adc_bits, S.fs, pgaGainStr(S.pga_gain_code), S.vref_halfmv);
             S.configReceived = true;
-            logMsg(sprintf('Config OK: ADC=%d bits  fs=%d SPS  PGA code=%d(%s)  Vref=±%dmV  pktsz=%d  scale=%.3e mV/cnt',...
-                S.adc_bits, S.fs, S.pga_gain_code, pgaGainStr(S.pga_gain_code), S.vref_halfmv, S.pktTotalBytes, S.scale));
+            logMsg(sprintf('Config OK: ADC=%d bits  fs=%d SPS  PGA=%s  Vref=±%dmV  scale=%.3e mV/cnt',...
+                S.adc_bits, S.fs, pgaGainStr(S.pga_gain_code), S.vref_halfmv, S.scale));
         else
-            logMsg(sprintf('WARN: config incompleta (tipo2=%d tipo3=%d) — usando defaults',...
-                gotType2, gotType3));
+            logMsg('WARN: config incompleta — usando defaults');
             lblCfgInfo.Text = 'Config: defaults (PSoC no respondió)';
         end
-        if gotType4
-            updateServoDisplay();
-            logMsg(sprintf('VRef actual: VDp=%d VDn=%d', S.servo_vdac_p, S.servo_vdac_n));
-        end
-        if gotType6
-            edtPVRef.Value = double(S.vdac_p_ref);
-            edtNVRef.Value = double(S.vdac_n_ref);
-            logMsg(sprintf('VRef cfg: pVRef=%d (0x%02X) nVRef=%d (0x%02X)',...
-                S.vdac_p_ref, S.vdac_p_ref, S.vdac_n_ref, S.vdac_n_ref));
-        end
-        if gotAmux && S.amux_ch <= 2
-            ddMux.Value = ddMux.Items{S.amux_ch + 1};
-            updateVRefEnableState();
-            logMsg(sprintf('AMux: %s (ch=%d)', ddMux.Items{S.amux_ch+1}, S.amux_ch));
-        end
         try, flush(S.sp); catch, end
-        S.rxBuf    = uint8([]);
-        S.parseState = 0;
+        S.rxBuf = uint8([]); S.parseState = 0; S.pktIdx = 0;
+        S.pktBuf = zeros(5,1,'uint8');
         saveConfig();
     end
 
@@ -1211,13 +1522,21 @@ function geophone_scope_simple()
                 flush(S.sp); pause(0.05);
                 S.isConnected=true; S.streamEnabled=false;
                 S.rxBuf=uint8([]); S.parseState=0;
+                S.pktBuf=zeros(5,1,'uint8'); S.pktIdx=0;
+                S.tickCount=0; S.totalBytes=0;
+                S.rxJunkBytes=0; S.rxBadTypes=0; S.rxFrames=0;
+                S.streamStartT0=uint64(0); S.noDataWarned=false;
                 lname=fullfile(logsDir,sprintf('scope_%s.log',datestr(now,'yyyymmdd_HHMMSS')));
                 S.logFid=fopen(lname,'w');
                 if S.logFid>0
                     fprintf(S.logFid,'=== geophone_scope_simple — %s ===\n',datestr(now));
+                    fprintf(S.logFid,'Log: %s\n', lname);
+                    fprintf(S.logFid,'Puerto: %s @ %d baud\n', com, baud);
                 end
                 lblStat.Text='CONECTADO: '+com;
                 logMsg("Conectado "+com+" @ "+string(baud));
+                logMsg("Log: "+string(lname));
+                logMsg("DIAG: si PGA/VDAC no responden → verificar en PSoC Creator que UART_PC tiene RX habilitado con buffer > 1");
                 requestAndParseConfig();
                 saveConfig(); startStreamTimer();
             catch e
@@ -1226,6 +1545,12 @@ function geophone_scope_simple()
             end
         else
             stopStreamTimer(); S.streamEnabled=false;
+            try
+                if ~isempty(S.sp)
+                    write(S.sp, psocCmd(0xA1, 0), 'uint8');
+                    pause(0.02);
+                end
+            catch, end
             try, if ~isempty(S.sp), try flush(S.sp);catch,end; delete(S.sp); end; catch,end
             logMsg("Desconectado.");
             if S.logFid>0, try fclose(S.logFid);catch,end; S.logFid=-1; end
@@ -1240,19 +1565,41 @@ function geophone_scope_simple()
     % =====================================================================
     % Stream / Clear
     % =====================================================================
+    function ok = sendStreamCommand(enableStream)
+        ok = false;
+        if ~S.isConnected || isempty(S.sp), logMsg("No conectado."); return; end
+        en = uint8(enableStream ~= 0);
+        bytes = psocCmd(0xA1, en);
+        try
+            write(S.sp, bytes, 'uint8');
+        catch ex
+            logMsg('Stream: error UART — ' + string(ex.message)); return;
+        end
+        if S.logFid>0
+            fprintf(S.logFid,'[%s] TX STREAM: %02X %02X %02X %02X\n',...
+                datestr(now,'HH:MM:SS.FFF'), bytes(1), bytes(2), bytes(3), bytes(4));
+        end
+        ok = true;
+    end
+
     function onStreamToggle(~,~)
         if ~S.isConnected, logMsg("No conectado."); return; end
         if ~S.streamEnabled
+            if ~sendStreamCommand(1), return; end
             S.rxBuf=uint8([]); S.parseState=0;
             S.pktBuf=zeros(5,1,'uint8'); S.pktIdx=0;
+            S.totalBytes=0; S.rxJunkBytes=0; S.rxBadTypes=0; S.rxFrames=0;
+            S.streamStartT0=tic; S.noDataWarned=false;
             S.streamEnabled=true; logMsg("--- Stream ON ---");
         else
+            if ~sendStreamCommand(0), return; end
             S.streamEnabled=false; logMsg("--- Stream OFF ---");
         end
         updateBtnStates();
     end
     function onClear(~,~)
         S.notchVec=[]; S.filtVec=[]; S.nVec=[]; S.frameCount=0; S.filtZi=[];
+        resetLineCanceller();
         set(hRaw,  'XData',nan,'YData',nan);
         set(hNotch,'XData',nan,'YData',nan);
         ax1.XLimMode='auto'; ax1.YLimMode='auto';
@@ -1282,11 +1629,39 @@ function geophone_scope_simple()
     % Tick — 20 ms
     % =====================================================================
     function onStreamTick(~,~)
+        try
+            onStreamTickImpl();
+        catch e
+            if S.logFid>0
+                fprintf(S.logFid,'[%s] ERR timer: %s\n',datestr(now,'HH:MM:SS.FFF'),e.message);
+            end
+            S.rxBuf=uint8([]); S.parseState=0; S.pktIdx=0;
+            logMsg('ERR timer UART — parser reiniciado: ' + string(e.message));
+        end
+    end
+
+    function onStreamTickImpl()
         if ~S.isConnected||isempty(S.sp), return; end
         S.tickCount=S.tickCount+1;
 
+        % Chequeo periódico de confirmaciones pendientes
+        if S.pend_active
+            checkPending('', -1);  % solo dispara el timeout si ya pasaron 8s
+        end
+
         nAvail=S.sp.NumBytesAvailable;
-        logTick(nAvail); if nAvail<=0, return; end
+        logTick(nAvail);
+        if nAvail<=0
+            if S.streamEnabled && S.totalBytes==0 && ~S.noDataWarned && ...
+                    isa(S.streamStartT0,'uint64') && toc(S.streamStartT0) > 2.0
+                logMsg('SIN RX: COM abierto pero entraron 0 bytes. Reprogramar/verificar PSoC UART TX y baud.');
+                if S.logFid>0
+                    fprintf(S.logFid,'[%s] NO_RX_AFTER_START\n',datestr(now,'HH:MM:SS.FFF'));
+                end
+                S.noDataWarned=true;
+            end
+            return;
+        end
         nAvail = min(nAvail, 400);
         try, raw=read(S.sp,nAvail,"uint8");
         catch e
@@ -1300,46 +1675,117 @@ function geophone_scope_simple()
         S.totalBytes=S.totalBytes+numel(raw); logHex(raw);
         S.rxBuf=[S.rxBuf; uint8(raw(:))];
         newNotch=zeros(0,1); i=1; n=numel(S.rxBuf);
+        VALID_TYPES = uint8([0, 1, 2, 3, 4, 7]);
         while i<=n
             b=S.rxBuf(i);
-            if S.parseState==0
-                if b==uint8(0x56), S.pktBuf(1)=b; S.pktIdx=1; S.parseState=1; end
-                i=i+1;
-            else
-                S.pktIdx=S.pktIdx+1; S.pktBuf(S.pktIdx)=b; i=i+1;
-                if S.pktIdx==S.pktTotalBytes
-                    pkt=double(S.pktBuf(1:S.pktTotalBytes));
-                    if pkt(2)==1   % heartbeat
-                        logMsg(sprintf('HEARTBEAT bytes=%d',S.totalBytes));
-                        S.parseState=0; continue;
+            switch S.parseState
+                case 0  % buscar sync 0x56
+                    if b==uint8(0x56)
+                        S.pktBuf(1)=b; S.pktIdx=1; S.parseState=1;
+                    else
+                        S.rxJunkBytes = S.rxJunkBytes + 1;
                     end
-                    if pkt(2)==0   % data — int24 big-endian signed
-                        switch S.pktDataBytes
-                            case 1
-                                u = pkt(3);
-                                v = u - (u>=128)*256;
-                            case 2
-                                u = pkt(3)*256 + pkt(4);
-                                v = u - (pkt(3)>=128)*65536;
-                            otherwise
+                    i=i+1;
+                case 1  % validar tipo (byte 2)
+                    if any(b==VALID_TYPES)
+                        S.pktIdx=2; S.pktBuf(2)=b; S.parseState=2; i=i+1;
+                    else
+                        S.rxBadTypes = S.rxBadTypes + 1;
+                        S.parseState=0;
+                        if b~=uint8(0x56), i=i+1; end
+                    end
+                case 2  % acumular bytes restantes
+                    S.pktIdx=S.pktIdx+1; S.pktBuf(S.pktIdx)=b; i=i+1;
+                    if S.pktIdx==S.pktTotalBytes
+                        pkt=double(S.pktBuf(1:S.pktTotalBytes));
+                        S.rxFrames = S.rxFrames + 1;
+                        switch pkt(2)
+                            case 0  % data — int24 big-endian signed
                                 u = pkt(3)*65536 + pkt(4)*256 + pkt(5);
                                 v = u - (pkt(3)>=128)*16777216;
+                                newNotch(end+1,1)=v; %#ok<AGROW>
+                            case 1  % heartbeat — lleva estado PSoC
+                                hb_pga  = pkt(3);
+                                hb_vdac = pkt(4);
+                                hb_mode = pkt(5);
+                                % Validar que es un HB real (no desync): pga<=8, mode<=1
+                                if hb_pga <= 8 && hb_mode <= 1
+                                    S.pga_gain_code = hb_pga;
+                                    lblPGAGain.Text  = pgaGainStr(hb_pga);
+                                    S.servo_vdac = double(hb_vdac);
+                                    updateVdacCalcDisplay();
+                                    S.psoc_tx_mode = double(hb_mode);
+                                    modeStr = 'Crudo'; if hb_mode~=0, modeStr='Filter'; end
+                                    btnTxMode.Text = sprintf('PSoC: %s', modeStr);
+                                    logMsg(sprintf('HB  bytes=%d  PSoC→ PGA:%s  VDAC:%d  modo:%s',...
+                                        S.totalBytes, pgaGainStr(hb_pga), hb_vdac, modeStr));
+                                    checkPending('PGA',  hb_pga);
+                                    checkPending('VDAC', hb_vdac);
+                                else
+                                    % Heartbeat con valores imposibles = desync, ignorar
+                                    if S.logFid>0
+                                        fprintf(S.logFid,'  [desync-HB] pga=0x%02X vdac=%d mode=%d\n',...
+                                            hb_pga, hb_vdac, hb_mode);
+                                    end
+                                end
+                            case 3  % confirmación PGA (send_config tras 0xA6)
+                                newCode = pkt(3);
+                                if newCode <= 8
+                                    S.pga_gain_code = newCode;
+                                    lblPGAGain.Text  = pgaGainStr(newCode);
+                                    logMsg(sprintf('PSoC confirmó PGA: %s', pgaGainStr(newCode)));
+                                    checkPending('PGA', newCode);
+                                end
+                            case 4  % confirmación VRef: PGAvdac + VDAC
+                                newCode = pkt(3);
+                                newVdac = pkt(4);
+                                if newCode <= 8
+                                    S.servo_vdac_pga_code = newCode;
+                                    S.vdac_pga_code = newCode;
+                                    S.servo_vdac = double(newVdac);
+                                    S.vdac_ref = double(newVdac);
+                                    updateVdacCalcDisplay();
+                                    logMsg(sprintf('PSoC confirmó VRef: PGAvdac=%s  VDAC=0x%02X (%d)',...
+                                        pgaGainStr(newCode), newVdac, newVdac));
+                                    checkPending('PGAVDAC', newCode);
+                                    checkPending('VDAC', newVdac);
+                                end
+                            case 7  % ACK [0x56][0x07][cmd][val][0x00]
+                                ack_cmd = pkt(3);
+                                ack_val = pkt(4);
+                                switch ack_cmd
+                                    case hex2dec('A1')
+                                        streamVal = double(ack_val ~= 0);
+                                        S.streamEnabled = logical(streamVal);
+                                        logMsg(sprintf('ACK←PSoC  STREAM=%d', streamVal));
+                                        updateBtnStates();
+                                    case hex2dec('A8')
+                                        modeVal = double(ack_val ~= 0);
+                                        S.psoc_tx_mode = modeVal;
+                                        btnTxMode.Text = sprintf('PSoC: %s', iif(modeVal==0,'Crudo','Filter'));
+                                        logMsg(sprintf('ACK←PSoC  TXMODE=%d', modeVal));
+                                        checkPending('TXMODE', modeVal);
+                                    case hex2dec('AA')
+                                        S.servo_vdac = double(ack_val);
+                                        updateVdacCalcDisplay();
+                                        logMsg(sprintf('ACK←PSoC  VDAC=0x%02X (%d)', ack_val, ack_val));
+                                        checkPending('VDAC', ack_val);
+                                    case hex2dec('A9')
+                                        if ack_val <= 8
+                                            S.servo_vdac_pga_code = double(ack_val);
+                                            S.vdac_pga_code = double(ack_val);
+                                            updateVdacCalcDisplay();
+                                            logMsg(sprintf('ACK←PSoC  PGAvdac=%s', pgaGainStr(ack_val)));
+                                            checkPending('PGAVDAC', ack_val);
+                                        end
+                                    otherwise
+                                        logMsg(sprintf('ACK←PSoC  cmd=0x%02X val=%d', ack_cmd, ack_val));
+                                end
                         end
-                        newNotch(end+1,1)=v; %#ok<AGROW>
-                    elseif pkt(2)==4  % VREF_STATUS
-                        S.servo_vdac_p = pkt(3);
-                        S.servo_vdac_n = pkt(4);
-                        updateServoDisplay();
-                    elseif pkt(2)==5  % AMUX_STATUS — ch en byte 3
-                        ch = pkt(3);
-                        if ch <= 2
-                            S.amux_ch = ch;
-                            ddMux.Value = ddMux.Items{ch+1};
-                            updateVRefEnableState();
-                        end
+                        S.parseState=0;
                     end
+                otherwise
                     S.parseState=0;
-                end
             end
         end
         S.rxBuf=uint8([]); logParsed(numel(newNotch));
@@ -1369,315 +1815,61 @@ function geophone_scope_simple()
     % =====================================================================
     % Servo DC — display y envío de comandos
     % =====================================================================
-    function updateServoDisplay()
-        lblVdacP.Text = num2str(S.servo_vdac_p);
-        lblVdacN.Text = num2str(S.servo_vdac_n);
-    end
-
     function onApplyServo()
         if ~S.isConnected, logMsg('VRef: no conectado'); return; end
-        pV = max(0, min(255, round(double(edtPVRef.Value))));
-        nV = max(0, min(255, round(double(edtNVRef.Value))));
+        target = double(edtVRef.Value);
+        if ~isfinite(target), target = 0; end
+        target = max(0, min(51, target));
+        edtVRef.Value = target;
+
+        [code,gain,v,vdac_v,out_v,clamped] = currentVdacSetting();
+        if logical(chkVdacAuto.Value)
+            ddVdacPGA.Value = num2str(gain);
+        end
+
+        bytesGain = psocCmd(0xA9, code);
+        bytesVdac = psocCmd(0xAA, v);
         try
-            write(S.sp, uint8([0xAA, uint8(pV), uint8(nV)]), 'uint8');
+            write(S.sp, bytesGain, 'uint8');
+            pause(0.01);
+            write(S.sp, bytesVdac, 'uint8');
         catch ex
             logMsg('VRef: error UART — ' + string(ex.message)); return;
         end
-        S.vdac_p_ref = pV; S.vdac_n_ref = nV;
-        S.servo_vdac_p = pV; S.servo_vdac_n = nV;
-        updateServoDisplay();
-        logMsg(sprintf('VRef aplicado: pVRef=%d (0x%02X)  nVRef=%d (0x%02X)', pV,pV, nV,nV));
+
+        logMsg(sprintf('TX→PSoC  VRef=%.3f V => PGAvdac=%dx (0x%02X), VDAC=0x%02X (%d), DAC=%.3f V, Out=%.3f V%s',...
+            target, gain, code, uint8(v), v, vdac_v, out_v, iif(clamped,'  CLAMP','')));
+        logTX(bytesGain, sprintf('PGAvdac=%dx code=0x%02X', gain, code));
+        logTX(bytesVdac, sprintf('VDAC=0x%02X (%d)', v, v));
+
+        S.vref_target_v = target;
+        S.vdac_auto_gain = logical(chkVdacAuto.Value);
+        S.vdac_pga_code = code;
+        S.vdac_ref = v;
+        updateVdacCalcDisplay();
+        setPending('VDAC', v, bytesVdac);
         saveConfig();
     end
 
     % =====================================================================
-    % AutoCal VRef — minimiza DC en modo CM
+    % Modo TX PSoC: crudo o Filter
     % =====================================================================
-    function onAutoCalibrateVRef()
-        if ~S.isConnected, logMsg('AutoCal: no conectado'); return; end
-
-        S.calRunning     = true;
-        wasStreamEnabled = S.streamEnabled;
-        S.streamEnabled  = true;
-        lblCalSt.Text    = 'Calibrando...';
-        updateBtnStates();
-        drawnow;
-
-        % Cambia canal AMux, actualiza UI, drena datos del canal anterior
-        function cambiarCanal(ch_nuevo)
-            try, write(S.sp, uint8([0xA7, uint8(ch_nuevo)]), 'uint8'); catch, end
-            S.amux_ch = ch_nuevo;
-            try, ddMux.Value = ddMux.Items{ch_nuevo+1}; catch, end
-            pause(0.15);
-            S.notchVec=[]; S.filtVec=[]; S.nVec=[]; S.frameCount=0; S.filtZi=[]; S.dc_mean_mv=0;
-            set(hRaw,'XData',nan,'YData',nan); set(hNotch,'XData',nan,'YData',nan);
+    function onToggleTxMode()
+        if ~S.isConnected, logMsg('TxMode: no conectado'); return; end
+        newMode = uint8(1 - S.psoc_tx_mode);
+        bytes = psocCmd(0xA8, newMode);
+        try
+            write(S.sp, bytes, 'uint8');
+        catch ex
+            logMsg('TxMode: error UART — ' + string(ex.message)); return;
         end
-
-        % Aplica VDAC, resetea dc_iir, limpia buffer para acumulacion fresca
-        function ok = aplicarVDAC(pV, nV)
-            ok = false;
-            pV = max(0,min(255,round(double(pV))));
-            nV = max(0,min(255,round(double(nV))));
-            try, write(S.sp, uint8([0xAA, uint8(pV), uint8(nV)]), 'uint8'); catch, return; end
-            S.servo_vdac_p=pV; S.servo_vdac_n=nV;
-            edtPVRef.Value=double(pV); edtNVRef.Value=double(nV);
-            updateServoDisplay();
-            pause(0.05);
-            try, write(S.sp, uint8([0xA7, uint8(S.amux_ch)]), 'uint8'); catch, end
-            pause(0.15);
-            S.notchVec=[]; S.filtVec=[]; S.nVec=[]; S.frameCount=0; S.filtZi=[]; S.dc_mean_mv=0;
-            set(hRaw,'XData',nan,'YData',nan); set(hNotch,'XData',nan,'YData',nan);
-            ok = true;
-        end
-
-        % Espera duracion_s seg y mide DC. Ventana FIJA para todos los pasos
-        % de busqueda -> factores IIR identicos -> ratios y comparaciones exactos.
-        % Descarta primeros numel(filtB)-1 muestras (transitorio FIR).
-        function dc = medirDC(duracion_s)
-            t0 = tic;
-            while toc(t0) < duracion_s, pause(0.05); end
-            nFIR = max(0, numel(S.filtB) - 1);
-            raw  = double(S.notchVec);
-            if numel(raw) <= nFIR, dc = 0;
-            else, dc = mean(raw(nFIR+1:end)) * S.scale; end
-        end
-
-        % Calibra un canal. v0=VDAC a optimizar, vOtra=VDAC fijo, esCMPos=bool.
-        % Todas las ventanas de busqueda son 2s (iguales) -> comparacion justa.
-        % La ventana 5s solo se usa al final como reporte, no para decidir.
-        function v_best = calibrarCanal(v0, vOtra, esCMPos)
-            v_best = -1;
-            nom = ddMux.Value;
-
-            % A: medicion inicial
-            if esCMPos, ok=aplicarVDAC(v0,vOtra); else, ok=aplicarVDAC(vOtra,v0); end
-            if ~ok, return; end
-            dc0 = medirDC(2.0);
-            logMsg(sprintf('AutoCal %s: v=%d  DC=%.1f mV', nom, v0, dc0)); drawnow;
-
-            % B: perturbacion para sensibilidad
-            delta_p = 10;
-            v1 = max(0, min(255, v0 + delta_p));
-            if v1 == v0,  v1 = max(0, min(255, v0 - delta_p)); end
-            if v1 == v0,  logMsg(sprintf('AutoCal %s: VDAC en limite', nom)); return; end
-            if esCMPos, ok=aplicarVDAC(v1,vOtra); else, ok=aplicarVDAC(vOtra,v1); end
-            if ~ok, return; end
-            dc1 = medirDC(2.0);
-            logMsg(sprintf('AutoCal %s: v=%d  DC=%.1f mV (perturb)', nom, v1, dc1)); drawnow;
-
-            sens = (dc1 - dc0) / double(v1 - v0);
-            % dc0 y dc1 usan misma ventana -> factor IIR igual -> cancela en dc0/sens
-            if abs(sens) < 0.001
-                logMsg(sprintf('AutoCal %s: sens~0, abortando', nom)); return;
-            end
-
-            % C: estimacion lineal (misma ventana -> factor cancela, estimado correcto)
-            v_est = max(0, min(255, round(v0 - dc0 / sens)));
-            logMsg(sprintf('AutoCal %s: sens=%.2f mV/cnt  v_est=%d', nom, sens, v_est));
-            if esCMPos, ok=aplicarVDAC(v_est,vOtra); else, ok=aplicarVDAC(vOtra,v_est); end
-            if ~ok, return; end
-            dc_est = medirDC(2.0);
-            logMsg(sprintf('AutoCal %s: v=%d  DC=%.1f mV', nom, v_est, dc_est)); drawnow;
-
-            % D: busqueda fina +/-1..4 (todas 2s -> factor IIR identico -> |DC| comparables)
-            best_v  = v_est;
-            best_dc = abs(dc_est);
-            for delta = [-4 -3 -2 -1 1 2 3 4]
-                v_try = max(0, min(255, v_est + delta));
-                if v_try == best_v, continue; end
-                if esCMPos, ok=aplicarVDAC(v_try,vOtra); else, ok=aplicarVDAC(vOtra,v_try); end
-                if ~ok, break; end
-                dc_try = medirDC(2.0);
-                logMsg(sprintf('AutoCal %s: v=%d  DC=%.1f mV', nom, v_try, dc_try)); drawnow;
-                if abs(dc_try) < best_dc
-                    best_dc = abs(dc_try); best_v = v_try;
-                end
-            end
-
-            % E: aplicar mejor, verificacion final 5s (solo reporte)
-            if esCMPos, aplicarVDAC(best_v,vOtra); else, aplicarVDAC(vOtra,best_v); end
-            dc_fin = medirDC(5.0);
-            logMsg(sprintf('AutoCal %s OK: v=%d  |DC|=%.2f mV (5s)', nom, best_v, dc_fin)); drawnow;
-            v_best = best_v;
-        end
-
-        % Secuencia: CM+ -> CM- -> Diferencial
-        pV_ini = S.servo_vdac_p;
-        nV_ini = S.servo_vdac_n;
-
-        logMsg('AutoCal: cambio a CM Positiva (pVRef)');
-        cambiarCanal(1); drawnow;
-        v_p = calibrarCanal(pV_ini, nV_ini, true);
-        if v_p < 0, v_p = pV_ini; logMsg('AutoCal CM+: sin resultado, mantiene original'); end
-
-        logMsg('AutoCal: cambio a CM Negativa (nVRef)');
-        cambiarCanal(2); drawnow;
-        v_n = calibrarCanal(nV_ini, v_p, false);
-        if v_n < 0, v_n = nV_ini; logMsg('AutoCal CM-: sin resultado, mantiene original'); end
-
-        logMsg('AutoCal: volviendo a Diferencial');
-        cambiarCanal(0); drawnow;
-
-        % Guardar en servo_configs para el PGA activo
-        code = S.pga_gain_code;
-        nueva = struct('pga_code',code,'p_vref',v_p,'n_vref',v_n);
-        idx_cfg = findServoCfgByCode(code);
-        if isempty(idx_cfg)
-            if isempty(S.servo_configs), S.servo_configs=nueva;
-            else, S.servo_configs(end+1)=nueva; end
-        else, S.servo_configs(idx_cfg)=nueva; end
-        S.vdac_p_ref=v_p; S.vdac_n_ref=v_n;
+        logMsg(sprintf('TX→PSoC  [AB A8 %02X %02X]  modo=%s (retry auto)',newMode,bytes(4),iif(newMode==0,'crudo','filter')));
+        S.psoc_tx_mode = double(newMode);
+        btnTxMode.Text = sprintf('PSoC: %s', iif(newMode==0,'Crudo','Filter'));
+        setPending('TXMODE', double(newMode), bytes);
         saveConfig();
-        logMsg(sprintf('AutoCal DONE: PGA %dx  pVRef=%d  nVRef=%d', pgaCodeToGain(code), v_p, v_n));
-        lblCalSt.Text = sprintf('p=%d n=%d', v_p, v_n);
-
-        S.calRunning     = false;
-        S.streamEnabled  = wasStreamEnabled;
-        updateBtnStates();
-        drawnow;
     end
 
-    % =====================================================================
-    % AMux — modo de vista
-    % =====================================================================
-    function onMuxChanged()
-        ch = find(strcmp(ddMux.Items, ddMux.Value), 1) - 1;
-        S.amux_ch = ch;
-        if S.isConnected
-            try
-                write(S.sp, uint8([0xA7, uint8(ch)]), 'uint8');
-            catch ex
-                logMsg('AMux: error UART — ' + string(ex.message));
-            end
-        end
-        updateVRefEnableState();
-        logMsg(sprintf('Modo: %s (ch=%d)', ddMux.Value, ch));
-    end
-
-    function updateVRefEnableState()
-        en = (S.amux_ch ~= 0);
-        edtPVRef.Enable      = en;
-        edtNVRef.Enable      = en;
-        btnApplyServo.Enable = en;
-        btnGuardarCfg.Enable = en;
-        btnAutoCal.Enable    = S.isConnected && ~S.calRunning;
-    end
-
-    % =====================================================================
-    % Configs de servo por ganancia PGA
-    % =====================================================================
-    function idx = findServoCfgByCode(code)
-        idx = [];
-        for ii = 1:numel(S.servo_configs)
-            if S.servo_configs(ii).pga_code == code
-                idx = ii; return;
-            end
-        end
-    end
-
-    function onGuardarCfgPGA()
-        try
-            code = S.pga_gain_code;
-            pV = double(S.servo_vdac_p);
-            nV = double(S.servo_vdac_n);
-            nueva = struct('pga_code', code, 'p_vref', pV, 'n_vref', nV);
-            idx = findServoCfgByCode(code);
-            if isempty(idx)
-                if isempty(S.servo_configs), S.servo_configs = nueva;
-                else, S.servo_configs(end+1) = nueva; end
-                logMsg(sprintf('Cfg guardada: PGA %dx  pV=%d  nV=%d', pgaCodeToGain(code),pV,nV));
-            else
-                S.servo_configs(idx) = nueva;
-                logMsg(sprintf('Cfg actualizada: PGA %dx  pV=%d  nV=%d', pgaCodeToGain(code),pV,nV));
-            end
-            edtPVRef.Value = pV;
-            edtNVRef.Value = nV;
-            saveConfig();
-        catch ex
-            logMsg('ERROR Guardar cfg PGA: ' + string(ex.message));
-        end
-    end
-
-    function onEditarCfgs()
-        try
-            if isempty(S.servo_configs)
-                logMsg('No hay configuraciones de servo guardadas'); return;
-            end
-            gainNames = {'1x','2x','4x','8x','16x','24x','32x','48x','50x'};
-            nCfg = numel(S.servo_configs);
-            data = cell(nCfg, 3);
-            for ii = 1:nCfg
-                c = S.servo_configs(ii);
-                gIdx = max(1, min(9, c.pga_code + 1));
-                data{ii,1} = gainNames{gIdx};
-                data{ii,2} = double(c.p_vref);
-                data{ii,3} = double(c.n_vref);
-            end
-            dlg = uifigure('Name','Presets Servo DC por PGA',...
-                'Position',[200 350 620 230]);
-            tbl = uitable(dlg,'Data',data,...
-                'ColumnName',{'PGA','pVRef','nVRef'},...
-                'ColumnEditable',[false true true],...
-                'ColumnWidth',{80 80 80},...
-                'Position',[8 48 604 150]);
-            uibutton(dlg,'Text','Guardar cambios','Position',[8 8 130 32],...
-                'BackgroundColor',CLR_ON,'FontWeight','bold',...
-                'ButtonPushedFcn',@(~,~)guardarCambios());
-            uibutton(dlg,'Text','Eliminar seleccion','Position',[148 8 130 32],...
-                'BackgroundColor',CLR_DEL,'FontColor',[1 1 1],...
-                'ButtonPushedFcn',@(~,~)eliminarSeleccion());
-            uibutton(dlg,'Text','Cerrar','Position',[530 8 80 32],...
-                'ButtonPushedFcn',@(~,~)delete(dlg));
-        catch ex
-            logMsg('ERROR Editar cfg: ' + string(ex.message));
-        end
-
-        function guardarCambios()
-            try
-                d = tbl.Data;
-                nRows = size(d,1);
-                for jj = 1:nRows
-                    if iscell(d)
-                        raw2 = d{jj,2}; raw3 = d{jj,3};
-                    else
-                        raw2 = d{jj,2}; raw3 = d{jj,3};
-                        if iscell(raw2), raw2=raw2{1}; end
-                        if iscell(raw3), raw3=raw3{1}; end
-                    end
-                    if ischar(raw2)||isstring(raw2), raw2=str2double(raw2); end
-                    if ischar(raw3)||isstring(raw3), raw3=str2double(raw3); end
-                    S.servo_configs(jj).p_vref = max(0,min(255,round(double(raw2))));
-                    S.servo_configs(jj).n_vref = max(0,min(255,round(double(raw3))));
-                end
-                saveConfig();
-                cfgIdx = findServoCfgByCode(S.pga_gain_code);
-                if ~isempty(cfgIdx)
-                    edtPVRef.Value = double(S.servo_configs(cfgIdx).p_vref);
-                    edtNVRef.Value = double(S.servo_configs(cfgIdx).n_vref);
-                end
-                logMsg('Presets servo guardados');
-                delete(dlg);
-            catch ex
-                logMsg('ERROR guardar cambios: ' + string(ex.message));
-            end
-        end
-
-        function eliminarSeleccion()
-            try
-                sel = tbl.Selection;
-                if isempty(sel), logMsg('Selecciona una fila para eliminar'); return; end
-                row = sel(1);
-                if row < 1 || row > numel(S.servo_configs), return; end
-                code = S.servo_configs(row).pga_code;
-                S.servo_configs(row) = [];
-                saveConfig();
-                logMsg(sprintf('Preset servo PGA %dx eliminado', pgaCodeToGain(code)));
-                delete(dlg);
-            catch ex
-                logMsg('ERROR eliminar: ' + string(ex.message));
-            end
-        end
-    end
 
     % =====================================================================
     % Cerrar
@@ -1686,6 +1878,7 @@ function geophone_scope_simple()
         try
             stopStreamTimer();
             if S.isConnected&&~isempty(S.sp)
+                try write(S.sp, psocCmd(0xA1, 0), 'uint8'); pause(0.02); catch,end
                 try flush(S.sp);catch,end; try delete(S.sp);catch,end
             end
         catch,end
