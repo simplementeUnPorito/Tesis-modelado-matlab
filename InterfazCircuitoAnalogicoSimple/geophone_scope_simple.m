@@ -69,7 +69,7 @@ function geophone_scope_simple()
     S.pktTotalBytes   = 5;     % todos los paquetes PSoC son de 5 bytes
     S.pga_gain_code   = 4;     % código PGA (0=1x 1=2x 2=4x 3=8x 4=16x 5=24x 6=32x 7=48x 8=50x)
     S.vref_halfmv     = 2500;
-    S.scale = S.vref_halfmv / 2^(S.adc_bits - 1);  % mV/count — ADC signed right-justified
+    S.scale = S.vref_halfmv / 1000 / 2^(S.pktDataBytes*8 - 2);  % V/count — usa adc_bits y vref recibidos del PSoC
 
     S.maxPoints   = 9000;
     S.nVec        = zeros(0,1);
@@ -83,14 +83,14 @@ function geophone_scope_simple()
     S.fs    = 1020;
     S.tWin  = 5000;
 
-    S.yAuto  = true;   S.yMin = -100;  S.yMax = 100;
+    S.yAuto  = true;   S.yMin = -S.vref_halfmv/1000;  S.yMax = S.vref_halfmv/1000;
     S.tAuto  = true;   S.tMin = 0;     S.tMax = 5000;
     S.showRaw = true;  % visibilidad de la línea cruda
 
     S.filtCmd  = '';
     S.filtB    = [];
     S.dcRemove = false;
-    S.yRange   = 100;
+    S.yRange   = S.vref_halfmv/1000;  % inicia en el rango completo del ADC (no se persiste)
     S.lineCancel = false;
     S.lineF0 = 50;
     S.lineHarmMax = 1;
@@ -120,6 +120,7 @@ function geophone_scope_simple()
     S.pend_bytes   = [];    % bytes a retransmitir
     S.pend_retries = 0;     % intentos realizados (0 = primer envio)
     S.pend_retry_t = 0;     % tic del ultimo intento
+    S.vref_cal_table = nan(9, 3); % [pgavdac_code, vdac_byte, vdac_target_v] por pga_code 0-8
 
     defCom  = 'COM7';
     defBaud = 115200;
@@ -132,12 +133,21 @@ function geophone_scope_simple()
     if isfile(cfgFile)
         try
             cfg = load(cfgFile);
-            flds = {'fs','maxPoints','tWin','filtCmd','filtB','yRange',...
-                    'yMin','yMax','yAuto','tMin','tMax','tAuto','dcRemove','showRaw',...
+            flds = {'fs','maxPoints','tWin','filtCmd','filtB',...
+                    'yMin','yMax','tMin','tMax','tAuto','dcRemove','showRaw',...
                     'lineCancel','lineF0','lineHarmMax','lineMu','lineEpsilon',...
                     'vdac_ref','vdac_pga_code','vdac_auto_gain','vref_target_v','psoc_tx_mode'};
             for k = 1:numel(flds)
                 if isfield(cfg,flds{k}), S.(flds{k}) = cfg.(flds{k}); end
+            end
+            if isfield(cfg,'vref_cal_table') && isnumeric(cfg.vref_cal_table) && ...
+                    isequal(size(cfg.vref_cal_table), [9 3])
+                S.vref_cal_table = double(cfg.vref_cal_table);
+            end
+            % Migrar config antigua: yMin/yMax estaban en mV — si superan el rango ADC, resetear
+            adcRng = S.vref_halfmv / 1000;
+            if abs(S.yMin) > adcRng
+                S.yMin = -adcRng;  S.yMax = adcRng;
             end
             if ~isfield(cfg,'vref_target_v')
                 gtbl = [1, 2, 4, 8, 16, 24, 32, 48, 50];
@@ -178,7 +188,7 @@ function geophone_scope_simple()
     ax1 = uiaxes(fig,'Position',[20 55 820 1000]);
     ax1.XGrid='on'; ax1.YGrid='on';
     ax1.XMinorGrid='on'; ax1.YMinorGrid='on';
-    title(ax1,'Señal en tiempo'); ylabel(ax1,'mV'); xlabel(ax1,'tiempo (ms)');
+    title(ax1,'Señal en tiempo'); ylabel(ax1,'V'); xlabel(ax1,'tiempo (ms)');
     hold(ax1,'on');
     hRaw   = plot(ax1, nan, nan, 'Color',[1.0 0.85 0.3],'LineStyle','--','LineWidth',0.8);
     hNotch  = plot(ax1, nan, nan, 'Color',[0 1 0.5],'LineWidth',1.2);
@@ -221,45 +231,45 @@ function geophone_scope_simple()
         'FontSize',8,'BackgroundColor',CLR_OFF,'FontColor',[0 0 0],...
         'Tooltip','Alterna entre dato crudo ADC y salida del Filter DFB en el PSoC',...
         'ButtonPushedFcn',@(~,~)onToggleTxMode());
-    uilabel(pCtrl,'Text','fs:','Position',[100 14 20 18],'FontSize',8);
+    uilabel(pCtrl,'Text','fs:','Position',[100 14 18 18],'FontSize',8);
     edtFs = uieditfield(pCtrl,'text','Value',num2str(S.fs),...
-        'Position',[122 12 58 22],'FontSize',8,...
+        'Position',[118 12 40 22],'FontSize',8,...
         'ValueChangedFcn',@(~,~)onFsChanged());
-    uilabel(pCtrl,'Text','Hz','Position',[184 14 24 18],'FontSize',8);
+    uilabel(pCtrl,'Text','Hz','Position',[160 14 14 18],'FontSize',8);
+    uilabel(pCtrl,'Text','μ:','Position',[176 14 14 18],'FontSize',8);
+    edtLineMu = uieditfield(pCtrl,'numeric','Value',S.lineMu,...
+        'Limits',[0 2],'ValueDisplayFormat','%.3g',...
+        'Position',[192 12 30 22],'FontSize',8,...
+        'Tooltip','Tasa de aprendizaje NLMS. Rango (0,2): mu=0.01 lento/estable, mu=0.5 rápido, mu>1 riesgoso.',...
+        'ValueChangedFcn',@(~,~)onLineMuChanged());
 
     % --- VRef DC ---
-    pServo = uipanel(fig,'Title','VRef DC','Position',[RX 913 RW 132]);
-    uilabel(pServo,'Text','Vref:','Position',[6 84 36 18],'FontSize',8);
-    edtVRef = uieditfield(pServo,'numeric','Value',S.vref_target_v,...
-        'Limits',[0 51],'ValueDisplayFormat','%.3f',...
-        'Position',[44 82 62 22],'FontSize',8,...
-        'ValueChangedFcn',@(~,~)onVdacUiChanged());
-    uilabel(pServo,'Text','V','Position',[110 84 12 18],'FontSize',8);
-    chkVdacAuto = uicheckbox(pServo,'Text','Auto','Value',S.vdac_auto_gain,...
-        'Position',[126 84 48 18],'FontSize',8,...
-        'ValueChangedFcn',@(~,~)onVdacUiChanged());
-    btnApplyServo = uibutton(pServo,'Text','OK','Position',[176 80 42 26],...
-        'FontSize',8,'BackgroundColor',CLR_ON,'FontColor',[0 0 0],...
-        'ButtonPushedFcn',@(~,~)onApplyServo());
-    uilabel(pServo,'Text','PGA:','Position',[6 54 32 18],'FontSize',8);
-    ddVdacPGA = uidropdown(pServo,'Items',pgaGainItems(),...
-        'Value',num2str(pgaCodeToGain(S.vdac_pga_code)),...
-        'Position',[44 52 62 22],'FontSize',8,...
-        'ValueChangedFcn',@(~,~)onVdacUiChanged());
-    uilabel(pServo,'Text','VDAC:','Position',[112 54 34 18],'FontSize',8);
+    pServo = uipanel(fig,'Title','VRef DC','Position',[RX 913 RW 130]);
+    uilabel(pServo,'Text','VDAC:','Position',[6 92 36 18],'FontSize',8);
     lblVdacCalc = uilabel(pServo,'Text','0x00 (0)',...
-        'Position',[148 54 74 18],'FontSize',8,'FontWeight','bold');
-    uilabel(pServo,'Text','DAC:','Position',[6 28 32 18],'FontSize',8);
-    lblVdacDac = uilabel(pServo,'Text','0.000 V',...
-        'Position',[44 28 76 18],'FontSize',8);
-    uilabel(pServo,'Text','Out:','Position',[126 28 28 18],'FontSize',8);
-    lblVdacOut = uilabel(pServo,'Text','0.000 V',...
-        'Position',[154 28 66 18],'FontSize',8);
-    uilabel(pServo,'Text','PSoC:','Position',[6 6 36 18],'FontSize',8);
+        'Position',[44 92 72 18],'FontSize',8,'FontWeight','bold');
+    uilabel(pServo,'Text','DAC:','Position',[118 92 30 18],'FontSize',8);
+    lblVdacDac = uilabel(pServo,'Text','0.000 V','Position',[148 92 72 18],'FontSize',8);
+    uilabel(pServo,'Text','PSoC:','Position',[6 70 36 18],'FontSize',8);
     lblVdac = uilabel(pServo,'Text',sprintf('0x%02X (%d)',S.servo_vdac,S.servo_vdac),...
-        'Position',[44 6 78 18],'FontSize',8,'FontWeight','bold');
+        'Position',[44 70 78 18],'FontSize',8,'FontWeight','bold');
     lblVdacPga = uilabel(pServo,'Text',sprintf('PGA %dx',pgaCodeToGain(S.servo_vdac_pga_code)),...
-        'Position',[126 6 92 18],'FontSize',8,'FontWeight','bold');
+        'Position',[126 70 92 18],'FontSize',8,'FontWeight','bold');
+    edtVout = uieditfield(pServo,'numeric','Value',S.vref_target_v,...
+        'Limits',[0 51],'ValueDisplayFormat','%.4f',...
+        'Position',[6 46 148 22],'FontSize',9,...
+        'Tooltip','Voltaje de salida VDAC×PGA (V)');
+    btnSend = uibutton(pServo,'Text','Enviar','Position',[158 46 54 22],...
+        'FontSize',8,'BackgroundColor',CLR_ON,'FontColor',[0 0 0],...
+        'ButtonPushedFcn',@(~,~)onSendVout());
+    btnVdacDn = uibutton(pServo,'Text','- bit','Position',[6 22 100 22],...
+        'FontSize',9,'FontWeight','bold',...
+        'ButtonPushedFcn',@(~,~)onVdacStep(-1));
+    btnVdacUp = uibutton(pServo,'Text','+ bit','Position',[112 22 100 22],...
+        'FontSize',9,'FontWeight','bold','BackgroundColor',CLR_ON,'FontColor',[0 0 0],...
+        'ButtonPushedFcn',@(~,~)onVdacStep(+1));
+    lblCalStatus = uilabel(pServo,'Text',calcCalTableStatus(),...
+        'Position',[6 4 212 16],'FontSize',7,'FontAngle','italic');
 
     % --- Filtro FIR + DC ---
     pFilt = uipanel(fig,'Title','Filtro FIR MATLAB','Position',[RX 649 RW 124]);
@@ -373,10 +383,8 @@ function geophone_scope_simple()
     updateBtnStates();
     syncFsUi();
     updateInfo();
-    edtVRef.Value = double(S.vref_target_v);
-    chkVdacAuto.Value = logical(S.vdac_auto_gain);
-    ddVdacPGA.Value = num2str(pgaCodeToGain(S.vdac_pga_code));
     updateVdacCalcDisplay();
+    lblCalStatus.Text = calcCalTableStatus();
     refreshTree();
     if ~S.tAuto, try ax1.XLim=[S.tMin S.tMax]; catch, end; end
     if ~S.yAuto, try ax1.YLim=[S.yMin S.yMax]; catch, end; end
@@ -430,35 +438,15 @@ function geophone_scope_simple()
         out_v = vdac_v * gain;
     end
 
-    function [code,gain,byte,vdac_v,out_v,clamped] = currentVdacSetting()
-        if logical(chkVdacAuto.Value)
-            [code,gain,byte,vdac_v,out_v,clamped] = calcVdacSetting(edtVRef.Value, []);
-        else
-            forcedCode = pgaGainToCode(str2double(ddVdacPGA.Value));
-            [code,gain,byte,vdac_v,out_v,clamped] = calcVdacSetting(edtVRef.Value, forcedCode);
-        end
-    end
-
-    function onVdacUiChanged()
-        updateVdacCalcDisplay();
-    end
-
     function updateVdacCalcDisplay()
-        [~,gain,byte,vdac_v,out_v,clamped] = currentVdacSetting();
-        if logical(chkVdacAuto.Value)
-            ddVdacPGA.Value = num2str(gain);
-        end
-        ddVdacPGA.Enable = S.isConnected && ~logical(chkVdacAuto.Value);
+        byte   = double(S.vdac_ref);
+        vdac_v = byte * 0.004;
+        out_v  = vdac_v * pgaCodeToGain(S.vdac_pga_code);
         lblVdacCalc.Text = sprintf('0x%02X (%d)', byte, byte);
         lblVdacDac.Text  = sprintf('%.3f V', vdac_v);
-        lblVdacOut.Text  = sprintf('%.3f V', out_v);
         lblVdac.Text     = sprintf('0x%02X (%d)', S.servo_vdac, S.servo_vdac);
         lblVdacPga.Text  = sprintf('PGA %dx', pgaCodeToGain(S.servo_vdac_pga_code));
-        if clamped
-            lblVdacOut.FontColor = [0.85 0.15 0.15];
-        else
-            lblVdacOut.FontColor = [0 0 0];
-        end
+        edtVout.Value    = out_v;
     end
 
     function s = filtStatusStr()
@@ -578,9 +566,9 @@ function geophone_scope_simple()
         f0Val   = double(S.lineF0);
         mu      = double(S.lineMu);
         epsilon = double(S.lineEpsilon);
-        if ~isfinite(mu)      || mu      <= 0, mu      = 0.001; end
+        if ~isfinite(mu)      || mu      <  0, mu      = 0.001; end
         if ~isfinite(epsilon) || epsilon <= 0, epsilon = 1e-6;  end
-        mu = min(mu, 0.5);
+        mu = min(mu, 1.99);   % límite estricto de estabilidad NLMS
 
         harmonics = (1:hUse).';
         w  = double(S.lineWeights(:));
@@ -710,10 +698,10 @@ function geophone_scope_simple()
         ddPGA.Enable     = c;
         btnSetPGA.Enable = c;
         edtMaxPts.Enable  = ~r;
-        edtVRef.Enable    = c;
-        chkVdacAuto.Enable = c;
-        ddVdacPGA.Enable = c && ~logical(chkVdacAuto.Value);
-        btnApplyServo.Enable = c;
+        edtVout.Enable   = c;
+        btnSend.Enable   = c;
+        btnVdacDn.Enable = c;
+        btnVdacUp.Enable = c;
         btnTxMode.Enable  = c;
     end
 
@@ -822,18 +810,18 @@ function geophone_scope_simple()
     function applyFilter()
         S.filtZi = [];
         if isempty(S.notchVec), S.filtVec=zeros(0,1); return; end
-        raw_mV = S.notchVec * S.scale;
+        raw_V = double(S.notchVec(:)) * S.scale;
         if isempty(S.filtB)
-            processed = raw_mV;
+            processed = raw_V;
         else
             minLen = 3*(numel(S.filtB)-1);
-            if numel(raw_mV) < max(minLen,4)
-                processed = raw_mV;
+            if numel(raw_V) < max(minLen,4)
+                processed = raw_V;
             else
                 try
-                    [processed, S.filtZi] = filter(S.filtB, 1, raw_mV);
+                    [processed, S.filtZi] = filter(S.filtB, 1, raw_V);
                 catch
-                    processed = raw_mV;
+                    processed = raw_V;
                 end
             end
         end
@@ -878,38 +866,54 @@ function geophone_scope_simple()
     function replot()
         if isempty(S.nVec)||isempty(S.filtVec), return; end
         if ~isfinite(S.fs) || S.fs <= 0, return; end
-        tms    = double(S.nVec)/S.fs*1000.0;
-        raw_mV = S.notchVec*S.scale;
-        filt   = S.filtVec;
-        if S.dcRemove && ~isempty(filt), filt = filt - mean(filt); end
-        set(hRaw,   'XData', tms, 'YData', raw_mV);
+        % Snapshot consistente con longitud mínima; transpuesto a fila (1×n)
+        % para evitar la advertencia "Array is wrong shape or size" en uifigure.
+        n   = min([numel(S.nVec), numel(S.notchVec), numel(S.filtVec)]);
+        if n < 1, return; end
+        tms   = double(S.nVec(1:n))' / S.fs * 1000.0;   % 1×n ms
+        raw_V = double(S.notchVec(1:n))' * S.scale;       % 1×n V
+        filt  = double(S.filtVec(1:n))';                   % 1×n V
+        if S.dcRemove, filt = filt - mean(filt); end
+        set(hRaw,   'XData', tms, 'YData', raw_V);
         set(hNotch, 'XData', tms, 'YData', filt);
-        % Línea de promedio DC (naranja punteada) + etiqueta en panel
-        if ~isempty(filt)
+        % Línea de promedio DC — solo la ventana visible (S.tWin pts)
+        if S.tWin > 0
+            nVis = min(n, S.tWin);
+            dcMean = mean(filt(max(1, n - nVis + 1) : n));
+        else
             dcMean = mean(filt);
-            set(hDCLine, 'XData', [tms(1) tms(end)], 'YData', [dcMean dcMean]);
         end
+        set(hDCLine, 'XData', [tms(1) tms(end)], 'YData', [dcMean dcMean]);
         if ~S.tAuto
             try, ax1.XLim=[S.tMin S.tMax]; catch, end
-        elseif S.tWin>0 && ~isempty(tms)
+        elseif S.tWin>0
             tWin_ms = S.tWin/S.fs*1000;
             ax1.XLim=[max(0,tms(end)-tWin_ms), tms(end)];
         else, ax1.XLimMode='auto'; end
         if ~S.yAuto
             try, ax1.YLim=[S.yMin S.yMax]; catch, end
         else
-            % Usar percentil 2-98 para ignorar spikes de ruido UART
-            if numel(filt) >= 20
-                pcts = prctile(filt, [2 98]);
-                peak = max(abs(pcts));
-            else
+            % Percentil 2-98 para ignorar spikes UART
+            try
+                if n >= 20
+                    pcts = prctile(filt, [2 98]);
+                    peak = max(abs(pcts));
+                else
+                    peak = max(abs(filt));
+                end
+            catch
                 peak = max(abs(filt));
             end
-            if peak < 0.1, peak = 0.1; end
+            if peak == 0, peak = 1e-6; end
             target = peak * 1.5;
-            if target > S.yRange, S.yRange = target;
-            else, S.yRange = S.yRange*0.97 + target*0.03; end
-            S.yRange = max(S.yRange, 1.0);
+            if target > S.yRange
+                S.yRange = target;                        % expandir inmediato
+            elseif S.yRange > target * 4
+                S.yRange = S.yRange*0.80 + target*0.20;  % α=0.20 → TC≈100ms lejos
+            else
+                S.yRange = S.yRange*0.90 + target*0.10;  % α=0.10 → TC≈200ms normal
+            end
+            S.yRange = max(S.yRange, 1e-6);
             try, ax1.YLim=[-S.yRange S.yRange]; catch, end
         end
         updateTimeAxisUnits();
@@ -918,8 +922,8 @@ function geophone_scope_simple()
         try
             cfg.fs=S.fs; cfg.com=char(edtCom.Value); cfg.baud=double(edtBaud.Value);
             cfg.maxPoints=S.maxPoints; cfg.tWin=S.tWin;
-            cfg.filtCmd=S.filtCmd; cfg.filtB=S.filtB; cfg.yRange=S.yRange;
-            cfg.yMin=S.yMin; cfg.yMax=S.yMax; cfg.yAuto=S.yAuto;
+            cfg.filtCmd=char(edtFiltCmd.Value); cfg.filtB=S.filtB;
+            cfg.yMin=S.yMin; cfg.yMax=S.yMax;
             cfg.tMin=S.tMin; cfg.tMax=S.tMax; cfg.tAuto=S.tAuto;
             cfg.dcRemove=S.dcRemove; cfg.showRaw=S.showRaw;
             cfg.lineCancel=S.lineCancel; cfg.lineF0=S.lineF0;
@@ -929,8 +933,14 @@ function geophone_scope_simple()
             cfg.psoc_tx_mode=S.psoc_tx_mode;
             cfg.entCollapsed=S.entCollapsed;
             cfg.entidades=S.entidades;
+            cfg.vref_cal_table=S.vref_cal_table;
             save(cfgFile,'-struct','cfg');
         catch, end
+    end
+
+    function s = calcCalTableStatus()
+        filled = sum(~isnan(S.vref_cal_table(:,1)));
+        s = sprintf('Cal: %d/9', filled);
     end
 
     % =====================================================================
@@ -1289,7 +1299,7 @@ function geophone_scope_simple()
             logMsg("Selecciona una entidad primero."); return;
         end
         e=S.entidades(S.entActiva);
-        nueva.raw_mV=S.notchVec*S.scale;
+        nueva.raw_V=double(S.notchVec(:))'*S.scale;
         filtToSave=S.filtVec;
         if S.dcRemove&&~isempty(filtToSave), filtToSave=filtToSave-mean(filtToSave); end
         nueva.filtered=filtToSave;
@@ -1332,6 +1342,30 @@ function geophone_scope_simple()
         lblCfgInfo.Text = sprintf('ADC:%db  fs:%d SPS  PGA:%s  ±%dmV',...
             S.adc_bits, S.fs, pgaGainStr(code), S.vref_halfmv);
         setPending('PGA', code, bytes);
+
+        % Auto-aplicar Vref guardada para esta ganancia
+        row = code + 1;
+        if ~any(isnan(S.vref_cal_table(row,:)))
+            pgaVdacCode = uint8(S.vref_cal_table(row,1));
+            vdacByte    = uint8(S.vref_cal_table(row,2));
+            targetV     = S.vref_cal_table(row,3);
+            bG = psocCmd(0xA9, pgaVdacCode);
+            bV = psocCmd(0xAA, vdacByte);
+            try
+                write(S.sp, bG, 'uint8'); pause(0.01);
+                write(S.sp, bV, 'uint8');
+            catch ex
+                logMsg('AutoVRef: error UART — ' + string(ex.message));
+            end
+            S.vref_target_v = targetV;
+            S.vdac_pga_code = double(pgaVdacCode);
+            S.vdac_ref      = double(vdacByte);
+            updateVdacCalcDisplay();
+            setPending('VDAC', vdacByte, bV);
+            logMsg(sprintf('AutoVRef  PGA=%dx: pgavdac=%d byte=0x%02X target=%.3fV',...
+                gain, pgaVdacCode, vdacByte, targetV));
+        end
+
         saveConfig();
     end
 
@@ -1369,6 +1403,18 @@ function geophone_scope_simple()
         updateLineCancelBtn();
         saveConfig();
         logMsg(sprintf('Cancelador línea: hasta armónico %d', S.lineHarmMax));
+    end
+
+    function onLineMuChanged()
+        v = double(edtLineMu.Value);
+        if ~isfinite(v) || v < 0 || v >= 2
+            edtLineMu.Value = S.lineMu;
+            return;
+        end
+        S.lineMu = v;
+        resetLineCanceller();
+        saveConfig();
+        logMsg(sprintf('Cancelador línea NLMS: μ = %.4g', S.lineMu));
     end
 
     function onFsChanged()
@@ -1468,7 +1514,12 @@ function geophone_scope_simple()
             S.yAuto=false;
         else
             S.yAuto=true;
-            if ~isempty(S.filtVec), peak=max(abs(S.filtVec)); S.yRange=max(peak*1.25,1.0); end
+            if ~isempty(S.filtVec)
+                peak = max(abs(S.filtVec));
+                S.yRange = min(max(peak*1.25, 1e-3), S.vref_halfmv/1000);
+            else
+                S.yRange = S.vref_halfmv/1000;
+            end
         end
         updateZoomBtns(); replot(); saveConfig();
     end
@@ -1532,7 +1583,10 @@ function geophone_scope_simple()
         if gotType2 && gotType3
             S.pktDataBytes = 3;
             S.pktTotalBytes = 5;
-            S.scale = S.vref_halfmv / 2^(S.adc_bits - 1);
+            S.scale  = S.vref_halfmv / 1000 / 2^(S.pktDataBytes*8 - 2);  % ADC_GetResult32 left-shift 5 bits → denom=2^22
+            S.yRange = S.vref_halfmv / 1000;   % resetear al rango real del ADC
+            S.yMin   = -S.yRange;  S.yMax = S.yRange;
+            try, edtYMin.Value = S.yMin; edtYMax.Value = S.yMax; catch, end
             syncFsUi();
             ddPGA.Value     = num2str(pgaCodeToGain(S.pga_gain_code));
             lblPGAGain.Text = pgaGainStr(S.pga_gain_code);
@@ -1540,7 +1594,7 @@ function geophone_scope_simple()
             lblCfgInfo.Text = sprintf('ADC:%db  fs:%d SPS  PGA:%s  ±%dmV',...
                 S.adc_bits, S.fs, pgaGainStr(S.pga_gain_code), S.vref_halfmv);
             S.configReceived = true;
-            logMsg(sprintf('Config OK: ADC=%d bits  fs=%d SPS  PGA=%s  Vref=±%dmV  scale=%.3e mV/cnt',...
+            logMsg(sprintf('Config OK: ADC=%d bits  fs=%d SPS  PGA=%s  Vref=±%dmV  scale=%.3e V/cnt (int24/2^23)',...
                 S.adc_bits, S.fs, pgaGainStr(S.pga_gain_code), S.vref_halfmv, S.scale));
         else
             logMsg('WARN: config incompleta — usando defaults');
@@ -1855,42 +1909,109 @@ function geophone_scope_simple()
     end
 
     % =====================================================================
-    % Servo DC — display y envío de comandos
+    % Guardar Vref en tabla de calibración (llamada interna)
     % =====================================================================
-    function onApplyServo()
-        if ~S.isConnected, logMsg('VRef: no conectado'); return; end
-        target = double(edtVRef.Value);
-        if ~isfinite(target), target = 0; end
-        target = max(0, min(51, target));
-        edtVRef.Value = target;
+    function saveCalForCurrentPGA()
+        row = max(1, min(9, double(S.pga_gain_code) + 1));
+        S.vref_cal_table(row,:) = [double(S.vdac_pga_code), ...
+                                    double(S.vdac_ref), ...
+                                    double(S.vref_target_v)];
+        logMsg(sprintf('CalSave PGA=%dx: pgavdac=%d byte=0x%02X target=%.3fV  [%s]',...
+            pgaCodeToGain(row-1), S.vref_cal_table(row,1), ...
+            S.vref_cal_table(row,2), S.vref_cal_table(row,3), calcCalTableStatus()));
+        lblCalStatus.Text = calcCalTableStatus();
+    end
 
-        [code,gain,v,vdac_v,out_v,clamped] = currentVdacSetting();
-        if logical(chkVdacAuto.Value)
-            ddVdacPGA.Value = num2str(gain);
-        end
+    % =====================================================================
+    % +bit / -bit — mínimo paso de voltaje alcanzable desde el valor actual
+    % Elige el (PGAvdac, VDAC_byte) que produce el menor cambio posible.
+    % =====================================================================
+    function onVdacStep(dir)
+        if ~S.isConnected, return; end
+        V_cur = double(S.vdac_ref) * 0.004 * pgaCodeToGain(S.vdac_pga_code);
+        [newPgaCode, newByte, V_new] = findFinestStep(V_cur, dir);
+        if V_new == V_cur, return; end  % sin cambio posible (límite 0 o 255)
 
-        bytesGain = psocCmd(0xA9, code);
-        bytesVdac = psocCmd(0xAA, v);
+        bG = psocCmd(0xA9, newPgaCode);
+        bV = psocCmd(0xAA, newByte);
         try
-            write(S.sp, bytesGain, 'uint8');
-            pause(0.01);
-            write(S.sp, bytesVdac, 'uint8');
+            if double(newPgaCode) ~= S.vdac_pga_code
+                write(S.sp, bG, 'uint8'); pause(0.01);
+            end
+            write(S.sp, bV, 'uint8');
         catch ex
-            logMsg('VRef: error UART — ' + string(ex.message)); return;
+            logMsg('VdacStep: error UART — ' + string(ex.message)); return;
         end
-
-        logMsg(sprintf('TX→PSoC  VRef=%.3f V => PGAvdac=%dx (0x%02X), VDAC=0x%02X (%d), DAC=%.3f V, Out=%.3f V%s',...
-            target, gain, code, uint8(v), v, vdac_v, out_v, iif(clamped,'  CLAMP','')));
-        logTX(bytesGain, sprintf('PGAvdac=%dx code=0x%02X', gain, code));
-        logTX(bytesVdac, sprintf('VDAC=0x%02X (%d)', v, v));
-
-        S.vref_target_v = target;
-        S.vdac_auto_gain = logical(chkVdacAuto.Value);
-        S.vdac_pga_code = code;
-        S.vdac_ref = v;
+        S.vdac_pga_code = double(newPgaCode);
+        S.vdac_ref      = double(newByte);
+        S.vref_target_v = V_new;
         updateVdacCalcDisplay();
-        setPending('VDAC', v, bytesVdac);
+        setPending('VDAC', newByte, bV);
+        saveCalForCurrentPGA();
         saveConfig();
+        logMsg(sprintf('VdacStep %+d → pgavdac=%dx byte=0x%02X  %.4fV  (delta=%.4fV)',...
+            dir, pgaCodeToGain(double(newPgaCode)), double(newByte), V_new, V_new-V_cur));
+    end
+
+    % =====================================================================
+    % Enviar — aplica el voltaje escrito en el textbox (usa calcVdacSetting)
+    % =====================================================================
+    function onSendVout()
+        if ~S.isConnected, return; end
+        target = max(0, min(51, double(edtVout.Value)));
+        if ~isfinite(target), return; end
+        [code, ~, v, ~, out_v, clamped] = calcVdacSetting(target, []);
+        bG = psocCmd(0xA9, code);
+        bV = psocCmd(0xAA, v);
+        try
+            write(S.sp, bG, 'uint8'); pause(0.01);
+            write(S.sp, bV, 'uint8');
+        catch ex
+            logMsg('SendVout: error UART — ' + string(ex.message)); return;
+        end
+        S.vdac_pga_code = double(code);
+        S.vdac_ref      = double(v);
+        S.vref_target_v = out_v;
+        updateVdacCalcDisplay();
+        setPending('VDAC', v, bV);
+        saveCalForCurrentPGA();
+        saveConfig();
+        logMsg(sprintf('SendVout → pgavdac=%dx byte=0x%02X  %.4fV%s',...
+            pgaCodeToGain(double(code)), double(v), out_v, iif(clamped,'  CLAMP','')));
+    end
+
+    % =====================================================================
+    % findFinestStep — halla (pgavdac_code, vdac_byte) con menor delta-V
+    % dir=+1 sube, dir=-1 baja; mínima variación posible desde V_cur
+    % =====================================================================
+    function [pgaCode, vdacByte, V_new] = findFinestStep(V_cur, dir)
+        LSB   = 0.004;
+        gains = [1, 2, 4, 8, 16, 24, 32, 48, 50];
+        bestDelta = inf;
+        pgaCode  = uint8(S.vdac_pga_code);
+        vdacByte = uint8(S.vdac_ref);
+        V_new    = V_cur;
+
+        for gi = 1:9
+            g    = gains(gi);
+            step = LSB * g;
+            if dir > 0
+                b_cur = floor(V_cur / step + 1e-9);
+                b_new = b_cur + 1;
+            else
+                b_cur = ceil(V_cur / step - 1e-9);
+                b_new = b_cur - 1;
+            end
+            if b_new < 0 || b_new > 255, continue; end
+            V_cand = b_new * step;
+            delta  = abs(V_cand - V_cur);
+            if delta > 0 && delta < bestDelta
+                bestDelta = delta;
+                pgaCode  = uint8(gi - 1);
+                vdacByte = uint8(b_new);
+                V_new    = V_cand;
+            end
+        end
     end
 
     % =====================================================================
@@ -1917,14 +2038,20 @@ function geophone_scope_simple()
     % Cerrar
     % =====================================================================
     function onClose(~,~)
-        try
-            stopStreamTimer();
-            if S.isConnected&&~isempty(S.sp)
-                try write(S.sp, psocCmd(0xA1, 0), 'uint8'); pause(0.02); catch,end
-                try flush(S.sp);catch,end; try delete(S.sp);catch,end
-            end
-        catch,end
+        try, stopStreamTimer(); catch, end
+        S.streamEnabled = false;
+        if S.isConnected&&~isempty(S.sp)
+            try write(S.sp, psocCmd(0xA1, 0), 'uint8'); pause(0.02); catch,end
+            try flush(S.sp);catch,end; try delete(S.sp); catch,end
+        end
         if S.logFid>0, try fclose(S.logFid);catch,end; S.logFid=-1; end
+        % Limpiar líneas antes de cerrar para evitar error SceneTree/replaceChild
+        try
+            set(hRaw,   'XData', NaN, 'YData', NaN);
+            set(hNotch, 'XData', NaN, 'YData', NaN);
+            set(hDCLine,'XData', NaN, 'YData', NaN);
+        catch, end
+        drawnow;
         saveConfig(); delete(fig);
     end
 
