@@ -5,7 +5,7 @@ function InterfaceESP()
 
 %% ── Constantes ─────────────────────────────────────────────────────────
 MAX_NODES    = 4;           % 1 maestro + 3 esclavos
-BAUD         = 115200;
+BAUD         = 921600;
 PKT_HEADER   = hex2dec('56');
 CMD_HEADER   = hex2dec('AB');
 CMD_DIRECTED = hex2dec('BD');
@@ -13,15 +13,17 @@ FS           = 4000;        % Hz
 DISP_SAMP    = FS * 5;
 VDAC_STEP    = 0.004;       % V/LSB
 NODE_NAMES   = {'Maestro','Esclavo 1','Esclavo 2','Esclavo 3'};
-LOG_DIR      = fileparts(mfilename('fullpath'));
-CFG_FILE     = fullfile(LOG_DIR, 'scope_config.mat');
+APP_DIR      = fileparts(mfilename('fullpath'));
+LOG_DIR      = fullfile(APP_DIR, 'logs');
+DATA_DIR     = fullfile(APP_DIR, 'datos');
+CFG_FILE     = fullfile(APP_DIR, 'scope_config.mat');
 N_LOG_SLOTS  = 10;
 
 %% ── Estado ──────────────────────────────────────────────────────────────
 S.port      = [];
 S.rxBuf     = uint8([]);
 S.streaming = false;
-S.nSlaves   = 2;
+S.nSlaves   = 0;
 logSlot     = 1;
 tmr         = [];
 
@@ -70,7 +72,6 @@ cbVis = gobjects(MAX_NODES,1);
 if isfile(CFG_FILE)
     try
         c = load(CFG_FILE);
-        if isfield(c,'nSlaves'),  S.nSlaves = c.nSlaves; end
         if isfield(c,'logSlot'),  logSlot   = c.logSlot; end
         if isfield(c,'nodesCfg')
             nc = c.nodesCfg;
@@ -85,6 +86,8 @@ if isfile(CFG_FILE)
 end
 
 %% ── Logs dobles, 10 slots rotativos ─────────────────────────────────────
+if ~isfolder(LOG_DIR), mkdir(LOG_DIR); end
+if ~isfolder(DATA_DIR), mkdir(DATA_DIR); end
 machLog = fullfile(LOG_DIR, sprintf('InterfaceESP_machine_%02d.log', logSlot));
 humLog  = fullfile(LOG_DIR, sprintf('InterfaceESP_human_%02d.log',  logSlot));
 nextSlot = mod(logSlot, N_LOG_SLOTS) + 1;
@@ -104,12 +107,17 @@ iniciarLog(machLog); iniciarLog(humLog);
 
 %% ── Figura ──────────────────────────────────────────────────────────────
 fig = uifigure('Name','InterfaceESP — Geófono Multi-Nodo', ...
-    'Position',[30 30 1440 920], 'CloseRequestFcn',@onClose);
+    'Position',[30 30 1440 920], 'CloseRequestFcn',@onClose, ...
+    'AutoResizeChildren','off');
 
 %% ── TabGroup izquierdo (columna única) ──────────────────────────────────
 TG_W = 340;
-tg       = uitabgroup(fig,'Position',[4 4 TG_W 908]);
-tgHidden = uitabgroup(fig,'Position',[-3000 -3000 TG_W 908]);
+UI_H = 908;
+AX_X = TG_W + 8;
+AX_W = 1440 - AX_X - 8;
+tg       = uitabgroup(fig,'Position',[4 4 TG_W UI_H]);
+tgHidden = uitabgroup(fig,'Position',[-3000 -3000 TG_W UI_H]);
+fig.SizeChangedFcn = @onResize;
 
 %  índices fijos: 1=Maestro, 2-4=Esclavos, 5=Stream, 6=Log
 tabs = gobjects(6,1);
@@ -126,16 +134,8 @@ buildStreamTab(tabs(5));
 buildLogTab(tabs(6));
 applyTabVisibility();
 
-%% ── Plots + checkboxes ──────────────────────────────────────────────────
-CHK_X = TG_W + 8;  CHK_W = 84;
-AX_X  = CHK_X + CHK_W + 2;
-AX_W  = 1440 - AX_X - 4;
-
-for ch = 1:MAX_NODES
-    cbVis(ch) = uicheckbox(fig,'Text',NODE_NAMES{ch}, ...
-        'Position',[CHK_X 908 - ch*26 CHK_W 22],'Value',true, ...
-        'ValueChangedFcn',@(src,~)onCheckboxChannel(ch,src.Value));
-end
+%% ── Plots ────────────────────────────────────────────────────────────────
+layoutFigure();
 buildPlots();
 applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
 
@@ -273,7 +273,7 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
             'ButtonPushedFcn',@(~,~)refreshPorts());
         uilabel(pC,'Text','Esclavos:','Position',[4 44 62 20]);
         spnSlaves = uispinner(pC,'Position',[70 44 52 22],'Value',S.nSlaves, ...
-            'Limits',[1 3],'Step',1,'RoundFractionalValues',true, ...
+            'Limits',[0 3],'Step',1,'RoundFractionalValues',true, ...
             'ValueChangedFcn',@onNSlavesChanged);
         btnConnect = uibutton(pC,'Text','Conectar',   'Position',[128 44 96 22], ...
             'ButtonPushedFcn',@onConnect);
@@ -331,19 +331,44 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
             'ButtonPushedFcn',@onSave);
         lblSaveSt = uilabel(pSv,'Text','','Position',[4 16 W-8 24], ...
             'FontColor',[0.1 0.5 0.1]);
+
+        % Canales visibles
+        pCh = uipanel(tab,'Title','Canales visibles','Position',[4 156 W 104]);
+        for ch = 1:MAX_NODES
+            cbVis(ch) = uicheckbox(pCh,'Text',NODE_NAMES{ch}, ...
+                'Position',[4 (MAX_NODES-ch)*22+8 W-8 20], ...
+                'Value',true, ...
+                'ValueChangedFcn',@(src,~)onCheckboxChannel(ch,src.Value));
+        end
     end
 
     function buildLogTab(tab)
         W = TG_W - 12;
-        uilabel(tab,'Text','Log (simplificado — ver _human_XX.log y _machine_XX.log):', ...
+        uilabel(tab,'Text','Log (simplificado - ver carpeta logs):', ...
             'Position',[4 878 W 20],'FontSize',8);
         taLog = uitextarea(tab,'Position',[4 4 W 872],'Editable','off','FontSize',9);
     end
 
 %% ── Plots ────────────────────────────────────────────────────────────────
 
+    function onResize(~,~)
+        layoutFigure();
+    end
+
+    function layoutFigure()
+        fp = fig.Position;
+        UI_H = max(320, fp(4) - 12);
+        AX_X = TG_W + 8;
+        AX_W = max(320, fp(3) - AX_X - 8);
+        tg.Position = [4 4 TG_W UI_H];
+        tgHidden.Position = [-3000 -3000 TG_W UI_H];
+        if isLiveHandle(S.node(1).ax)
+            updatePlotLayout();
+        end
+    end
+
     function buildPlots()
-        AH = floor((908 - 4 - (MAX_NODES-1)*4) / MAX_NODES);
+        AH = floor((UI_H - 4 - (MAX_NODES-1)*4) / MAX_NODES);
         for ch = 1:MAX_NODES
             yb = 4 + (MAX_NODES - ch) * (AH + 4);
             ax = uiaxes(fig,'Position',[AX_X yb AX_W AH]);
@@ -361,15 +386,16 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
     function applyTabVisibility()
         % Retirar todos los tabs del tabgroup visible
         for t = 1:6, tabs(t).Parent = tgHidden; end
-        % Re-agregar en orden correcto
+        % Re-agregar en orden visual: Stream, Maestro, Esclavos, Log
+        tabs(5).Parent = tg;                  % Stream primero
         tabs(1).Parent = tg;                  % Maestro siempre
         for slv = 1:S.nSlaves
             tabs(slv+1).Parent = tg;         % Esclavos activos
         end
-        tabs(5).Parent = tg;                  % Stream
         tabs(6).Parent = tg;                  % Log
+        tg.SelectedTab = tabs(5);
         % Solo actualizar plots si ya fueron creados
-        if isvalid(S.node(1).ax), applyPlotVisibility(); end
+        if isLiveHandle(S.node(1).ax), applyPlotVisibility(); end
     end
 
     function applyPlotVisibility()
@@ -378,17 +404,49 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
             % ch=1 = Maestro siempre visible
             % ch=2..nSlaves+1 = esclavos activos
             active = (ch == 1) || (ch <= 1 + S.nSlaves);
-            if isvalid(S.node(ch).ax)
-                onoff = ternary(active,'on','off');
-                S.node(ch).ax.Visible    = onoff;
-                S.node(ch).hRaw.Visible  = ternary(active && S.node(ch).visible,'on','off');
-                S.node(ch).hFilt.Visible = 'off';
-            end
-            if isvalid(cbVis(ch))
-                cbVis(ch).Value   = active;
+            if isLiveHandle(cbVis(ch))
+                wasActive = strcmp(cbVis(ch).Visible,'on');
+                if active && ~wasActive
+                    cbVis(ch).Value = true;
+                elseif ~active
+                    cbVis(ch).Value = false;
+                end
                 cbVis(ch).Visible = ternary(active,'on','off');
             end
-            S.node(ch).visible = active;
+            S.node(ch).visible = active && isLiveHandle(cbVis(ch)) && cbVis(ch).Value;
+        end
+        updatePlotLayout();
+    end
+
+    function updatePlotLayout()
+        visibleChannels = [];
+        for ch = 1:MAX_NODES
+            active = (ch == 1) || (ch <= 1 + S.nSlaves);
+            if active && S.node(ch).visible
+                visibleChannels(end+1) = ch; %#ok<AGROW>
+            end
+        end
+
+        nVis = numel(visibleChannels);
+        for ch = 1:MAX_NODES
+            if ~isLiveHandle(S.node(ch).ax), continue; end
+            if ~ismember(ch, visibleChannels)
+                S.node(ch).ax.Visible    = 'off';
+                S.node(ch).ax.Position   = [AX_X -3000 AX_W 1];
+                S.node(ch).hRaw.Visible  = 'off';
+                S.node(ch).hFilt.Visible = 'off';
+            end
+        end
+
+        if nVis == 0, return; end
+        ah = floor((UI_H - 4 - (nVis-1)*4) / nVis);
+        for k = 1:nVis
+            ch = visibleChannels(k);
+            yb = 4 + (nVis - k) * (ah + 4);
+            S.node(ch).ax.Position   = [AX_X yb AX_W ah];
+            S.node(ch).ax.Visible    = 'on';
+            S.node(ch).hRaw.Visible  = 'on';
+            S.node(ch).hFilt.Visible = ternary(~isempty(S.node(ch).filtBuf),'on','off');
         end
     end
 
@@ -401,7 +459,8 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
     end
 
     function onNSlavesChanged(~,~)
-        S.nSlaves = spnSlaves.Value;
+        S.nSlaves = max(0, min(3, round(spnSlaves.Value)));
+        spnSlaves.Value = S.nSlaves;
         applyTabVisibility();
         logH(sprintf('Esclavos: %d', S.nSlaves));
         logM(sprintf('nSlaves=%d', S.nSlaves));
@@ -415,6 +474,7 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
         try
             S.port = serialport(portName, BAUD);
             flush(S.port);
+            S.rxBuf = uint8([]);
         catch ME
             logH(['Error conexión: ' ME.message]);
             logM(['onConnect FAIL port=' portName ' ' ME.message]);
@@ -518,7 +578,7 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
             S.node(ch).lineW     = [];
             S.node(ch).driftHist = [];
             S.node(ch).batchCount= 0;
-            if isvalid(S.node(ch).ax)
+            if isLiveHandle(S.node(ch).ax)
                 set(S.node(ch).hRaw, 'XData',NaN,'YData',NaN);
                 set(S.node(ch).hFilt,'XData',NaN,'YData',NaN);
             end
@@ -551,6 +611,7 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
         start(tmrT);
         function ck(~,~)
             try, psocCmd(hex2dec('A7'), 0); catch, end
+            try, timerRX([],[]); catch, end
             S.streaming = false;
             g  = S.node(1).batchCount - init0;
             ok = g >= 10;   % ~4000 Hz × 3 s → esperar al menos 10 muestras
@@ -570,14 +631,28 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
 
     function onTestEsclavo(ch)
         if ch < 2 || ch > MAX_NODES, return; end
-        enviarDirigido(ch, hex2dec('A8'), 1);
+        wasStreaming = S.streaming;
+        if ~wasStreaming
+            psocCmd(hex2dec('A1'), 1);
+            S.streaming = true;
+            if isLiveHandle(btnStreamOn),  btnStreamOn.Enable  = 'off'; end
+            if isLiveHandle(btnStreamOff), btnStreamOff.Enable = 'on';  end
+        end
+        enviarDirigido(ch, hex2dec('A7'), 1);
         init0 = S.node(ch).batchCount;
         S.node(ch).lblSalud.FontColor   = [0.8 0.6 0.0];
         S.node(ch).lblSaludTxt.Text     = 'Probando...';
         tmrS = timer('StartDelay',4,'ExecutionMode','singleShot','TimerFcn',@ck);
         start(tmrS);
         function ck(~,~)
-            try, enviarDirigido(ch, hex2dec('A8'), 0); catch, end
+            try, enviarDirigido(ch, hex2dec('A7'), 0); catch, end
+            try, timerRX([],[]); catch, end
+            if ~wasStreaming
+                try, psocCmd(hex2dec('A1'), 0); catch, end
+                S.streaming = false;
+                if isLiveHandle(btnStreamOn),  btnStreamOn.Enable  = 'on';  end
+                if isLiveHandle(btnStreamOff), btnStreamOff.Enable = 'off'; end
+            end
             g  = S.node(ch).batchCount - init0;
             ok = g >= 10;
             S.node(ch).salud = 1 + ~ok;
@@ -695,11 +770,7 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
 
     function onCheckboxChannel(ch, val)
         S.node(ch).visible = val;
-        if ~isvalid(S.node(ch).ax), return; end
-        onoff = ternary(val,'on','off');
-        S.node(ch).ax.Visible       = onoff;
-        S.node(ch).hRaw.Visible     = onoff;
-        if ~val, S.node(ch).hFilt.Visible = 'off'; end
+        updatePlotLayout();
     end
 
 %% ════════════════════════════════════════════════════════════════════════
@@ -713,20 +784,26 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
             if n > 0, S.rxBuf = [S.rxBuf, read(S.port,n,'uint8')]; end
         catch; return; end
 
-        changed = false;
+        changedChannels = false(1, MAX_NODES);
         while length(S.rxBuf) >= 6
             idx = find(S.rxBuf == PKT_HEADER, 1);
             if isempty(idx), S.rxBuf = uint8([]); break; end
             if idx > 1, S.rxBuf = S.rxBuf(idx:end); end
             if length(S.rxBuf) < 6, break; end
-            decodePkt(S.rxBuf(1:6));
+            changedCh = decodePkt(S.rxBuf(1:6));
+            if changedCh >= 1 && changedCh <= MAX_NODES
+                changedChannels(changedCh) = true;
+            end
             S.rxBuf  = S.rxBuf(7:end);
-            changed  = true;
         end
-        if changed, drawnow limitrate; end
+        for chUpd = find(changedChannels)
+            updatePlot(chUpd);
+        end
+        if any(changedChannels), drawnow limitrate; end
     end
 
-    function decodePkt(pkt)
+    function changedCh = decodePkt(pkt)
+        changedCh = 0;
         node_id = double(pkt(2));
         typ     = double(pkt(3));
         b2=double(pkt(4)); b1=double(pkt(5)); b0=double(pkt(6));
@@ -748,6 +825,7 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
                 v24 = b2*65536 + b1*256 + b0;
                 if v24 >= 2^23, v24 = v24 - 2^24; end
                 appendSample(ch, v24);
+                changedCh = ch;
 
             case 1    % heartbeat [pga, vdac, state]
                 updateHBUI(ch, b2, b1);
@@ -787,13 +865,12 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
                 S.node(ch).filtBuf = S.node(ch).filtBuf(end-DISP_SAMP+1:end);
             end
         end
-        updatePlot(ch);
         % Stats cada 200 muestras
         if mod(S.node(ch).batchCount, 200) == 0, updateStats(ch); end
     end
 
     function updatePlot(ch)
-        if ~S.node(ch).visible || ~isvalid(S.node(ch).ax), return; end
+        if ~S.node(ch).visible || ~isLiveHandle(S.node(ch).ax), return; end
         raw = S.node(ch).notchBuf;
         if isempty(raw), return; end
         y = raw;
@@ -813,18 +890,18 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
             dStr = sprintf('%.1f±%.1f µs', ...
                 mean(S.node(ch).driftHist), std(S.node(ch).driftHist));
         end
-        if isvalid(S.node(ch).lblStats)
+        if isLiveHandle(S.node(ch).lblStats)
             S.node(ch).lblStats.Text = sprintf('Batches: %d  Drift: %s', ...
                 S.node(ch).batchCount, dStr);
         end
-        if ~isempty(S.node(ch).notchBuf) && isvalid(S.node(ch).lblLastVal)
+        if ~isempty(S.node(ch).notchBuf) && isLiveHandle(S.node(ch).lblLastVal)
             S.node(ch).lblLastVal.Text = sprintf('Último: %d LSB', ...
                 round(S.node(ch).notchBuf(end)));
         end
-        if isvalid(globalBatch(ch))
+        if isLiveHandle(globalBatch(ch))
             globalBatch(ch).Text = sprintf('%s: %d', NODE_NAMES{ch}, S.node(ch).batchCount);
         end
-        if ch >= 2 && isvalid(driftLabels(ch-1)) && ~isempty(S.node(ch).driftHist)
+        if ch >= 2 && isLiveHandle(driftLabels(ch-1)) && ~isempty(S.node(ch).driftHist)
             driftLabels(ch-1).Text = sprintf('Esclavo %d: %.1f±%.1f µs', ...
                 ch-1, mean(S.node(ch).driftHist), std(S.node(ch).driftHist));
         end
@@ -853,10 +930,10 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
     function onSave(~,~)
         base = strtrim(efSaveName.Value);
         if isempty(base), base = 'muestra'; end
-        ex   = dir(fullfile(LOG_DIR,[base '_*.mat']));
+        ex   = dir(fullfile(DATA_DIR,[base '_*.mat']));
         idx  = length(ex)+1;
         fn   = sprintf('%s_%03d.mat',base,idx);
-        fp   = fullfile(LOG_DIR,fn);
+        fp   = fullfile(DATA_DIR,fn);
 
         muestras.fecha   = datestr(now);
         muestras.fs      = FS;
@@ -895,10 +972,9 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
             nodesCfg(ch).filtCmd   = S.node(ch).filtCmd;
             nodesCfg(ch).dcRemove  = S.node(ch).dcRemove;
         end
-        nSlaves = S.nSlaves;   %#ok
         logSlot = nextSlot;    %#ok
         try
-            save(CFG_FILE,'nodesCfg','nSlaves','logSlot');
+            save(CFG_FILE,'nodesCfg','logSlot');
         catch
         end
     end
@@ -957,6 +1033,18 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
 %% ════════════════════════════════════════════════════════════════════════
 %%  Utilidades
 %% ════════════════════════════════════════════════════════════════════════
+
+    function tf = isLiveHandle(h)
+        if isempty(h)
+            tf = false;
+            return;
+        end
+        try
+            tf = all(isvalid(h));
+        catch
+            tf = false;
+        end
+    end
 
     function [yOut, w] = lineCanceller(x, w, n, fs, f0, nH, mu)
         if isempty(w), w = zeros(1,nH*2); end
