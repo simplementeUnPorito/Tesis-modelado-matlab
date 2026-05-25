@@ -4,28 +4,44 @@ function InterfaceESP()
 % Tabs: Maestro | Esclavo 1..N | Stream & Stats | Log
 
 %% ── Constantes ─────────────────────────────────────────────────────────
-MAX_NODES    = 4;           % 1 maestro + 3 esclavos
+MAX_NODES    = 3;           % 1 maestro + 2 esclavos
 BAUD         = 921600;
 PKT_HEADER   = hex2dec('56');
 CMD_HEADER   = hex2dec('AB');
 CMD_DIRECTED = hex2dec('BD');
-FS           = 4000;        % Hz
-DISP_SAMP    = FS * 5;
+FS           = 1020;        % Hz
+DISP_SAMP    = FS * 3;
 VDAC_STEP    = 0.004;       % V/LSB
 NODE_NAMES   = {'Maestro','Esclavo 1','Esclavo 2','Esclavo 3'};
+TX_MODE_ITEMS = {'Raw ADC','Filtered ADC'};
+TX_RAW       = uint8(0);
+TX_FILTERED  = uint8(1);
+TX_DEBUG     = uint8(2);
 APP_DIR      = fileparts(mfilename('fullpath'));
 LOG_DIR      = fullfile(APP_DIR, 'logs');
 DATA_DIR     = fullfile(APP_DIR, 'datos');
 CFG_FILE     = fullfile(APP_DIR, 'scope_config.mat');
-N_LOG_SLOTS  = 10;
+N_LOG_SESSIONS = 10;
 
 %% ── Estado ──────────────────────────────────────────────────────────────
-S.port      = [];
-S.rxBuf     = uint8([]);
-S.streaming = false;
-S.nSlaves   = 0;
-logSlot     = 1;
+S.port            = [];
+S.rxBuf           = uint8([]);
+S.streaming       = false;
+S.nSlaves         = 0;
+S.hammerTip       = 'gris';
+S.driftMeasuring  = false;
+S.driftT0         = [];
+S.driftDebugActive = false;
+S.streamDebug     = false;
+S.streamDebugActive = false;
+S.armPending      = false;
+S.armTimer        = [];
+S.renderDirty     = false(1, MAX_NODES);
+S.maxBuf          = FS * 10;
+S.saveBaseName    = 'muestra';
+S.lastUsbPort     = '';
 tmr         = [];
+tmrRender   = [];
 
 for ch = 1:MAX_NODES
     S.node(ch).notchBuf  = [];
@@ -38,11 +54,25 @@ for ch = 1:MAX_NODES
     S.node(ch).vdac_byte = 128;
     S.node(ch).pgavdac   = 0;
     S.node(ch).cal       = zeros(9,3);
+    S.node(ch).calValid  = false(9,1);
     S.node(ch).dcRemove  = false;
     S.node(ch).visible   = true;
     S.node(ch).driftHist = [];
-    S.node(ch).batchCount= 0;
-    S.node(ch).salud     = 0;
+    S.node(ch).batchCount    = 0;
+    S.node(ch).salud         = 0;
+    S.node(ch).tx_mode       = TX_RAW;
+    S.node(ch).debugActive   = false;
+    S.node(ch).gotFirst      = false;
+    S.node(ch).tFirst        = 0;
+    S.node(ch).notchEnabled  = false;
+    S.node(ch).notchMu       = 0.002;
+    S.node(ch).notchHarm     = 3;
+    S.node(ch).pending = struct('sub_cmds',[],'params',[],'times',uint64([]),'retries',[]);
+    if ch == 1
+        S.node(ch).slave_id = 'M';
+    else
+        S.node(ch).slave_id = sprintf('S%d', ch-1);
+    end
     % handles UI (poblados en buildTab)
     S.node(ch).ax        = [];
     S.node(ch).hRaw      = [];
@@ -50,15 +80,19 @@ for ch = 1:MAX_NODES
     S.node(ch).lblStats  = [];
     S.node(ch).lblLastVal= [];
     S.node(ch).lblFiltSt = [];
+    S.node(ch).dbgPort   = [];
+    S.node(ch).dbgBuf    = '';
+    S.node(ch).dbgTa     = [];
 end
 
 %% ── Handles UI en scope padre (compartidos entre nested functions) ───────
 % Conexión / Stream (buildStreamTab los asigna, callbacks los usan)
 ddPort = []; spnSlaves = []; btnConnect = []; btnDisconn = []; lblConn = [];
-btnArm = []; btnStart  = []; btnStop    = [];
+btnArm = [];
 lblSyncSt = []; lblArmCnt = [];
-btnStreamOn = []; btnStreamOff = [];
-cbLine = []; efMu = []; spnHarm = [];
+lblDatos  = [];
+btnStreamOn = [];
+% notch controls: now per-node in S.node(ch).notchEnabled/Mu/Harm
 driftLabels  = gobjects(3,1);
 globalBatch  = gobjects(MAX_NODES,1);
 efSaveName = []; lblSaveSt = [];
@@ -72,37 +106,78 @@ cbVis = gobjects(MAX_NODES,1);
 if isfile(CFG_FILE)
     try
         c = load(CFG_FILE);
-        if isfield(c,'logSlot'),  logSlot   = c.logSlot; end
-        if isfield(c,'nodesCfg')
+        if isfield(c,'appCfg')
+            applyConfigSnapshot(c.appCfg);
+        elseif isfield(c,'nodesCfg')
             nc = c.nodesCfg;
-            campos = {'pga_code','vdac_byte','pgavdac','cal','filtCmd','dcRemove'};
+            campos = {'pga_code','vdac_byte','pgavdac','cal','filtCmd','dcRemove', ...
+                'tx_mode','notchEnabled','notchMu','notchHarm','visible','filtB', ...
+                'slave_id','calValid'};
             for ch = 1:min(MAX_NODES, numel(nc))
                 for f = campos
                     if isfield(nc(ch),f{1}), S.node(ch).(f{1}) = nc(ch).(f{1}); end
+                end
+                if ~isempty(S.node(ch).filtB)
+                    S.node(ch).filtZi = zeros(1,max(0,length(S.node(ch).filtB)-1));
+                elseif ~isempty(S.node(ch).filtCmd)
+                    S.node(ch).filtB = compileFirCommand(S.node(ch).filtCmd);
+                    if ~isempty(S.node(ch).filtB)
+                        S.node(ch).filtZi = zeros(1,max(0,length(S.node(ch).filtB)-1));
+                    end
                 end
             end
         end
     catch, end
 end
 
-%% ── Logs dobles, 10 slots rotativos ─────────────────────────────────────
+%% ── Logs dobles, 10 sesiones fechadas ───────────────────────────────────
 if ~isfolder(LOG_DIR), mkdir(LOG_DIR); end
 if ~isfolder(DATA_DIR), mkdir(DATA_DIR); end
-machLog = fullfile(LOG_DIR, sprintf('InterfaceESP_machine_%02d.log', logSlot));
-humLog  = fullfile(LOG_DIR, sprintf('InterfaceESP_human_%02d.log',  logSlot));
-nextSlot = mod(logSlot, N_LOG_SLOTS) + 1;
-iniciarLog(machLog); iniciarLog(humLog);
+logStamp = datestr(now, 'yyyymmdd_HHMMSS');
+machLog = fullfile(LOG_DIR, sprintf('InterfaceESP_machine_%s.log', logStamp));
+humLog  = fullfile(LOG_DIR, sprintf('InterfaceESP_human_%s.log',  logStamp));
+iniciarLog(machLog, 'machine');
+iniciarLog(humLog,  'human');
+cleanupOldLogs(LOG_DIR, N_LOG_SESSIONS);
 
-    function iniciarLog(f)
+    function iniciarLog(f, tipo)
         fid = fopen(f,'w');
         if fid >= 0
-            fprintf(fid,'=== InterfaceESP %s ===\n', datestr(now));
+            fprintf(fid,'=== InterfaceESP %s | %s ===\n', tipo, datestr(now, 'yyyy-mm-dd HH:MM:SS'));
             fclose(fid);
         end
     end
     function agregarLog(f, linea)
         fid = fopen(f,'a');
         if fid >= 0, fprintf(fid,'%s\n',linea); fclose(fid); end
+    end
+    function cleanupOldLogs(logDir, maxSessions)
+        cleanupLogPrefix(logDir, 'InterfaceESP_human_*.log', maxSessions);
+        cleanupLogPrefix(logDir, 'InterfaceESP_machine_*.log', maxSessions);
+    end
+    function cleanupLogPrefix(logDir, pattern, maxKeep)
+        files = dir(fullfile(logDir, pattern));
+        if numel(files) <= maxKeep, return; end
+        keys = zeros(1, numel(files));
+        for iKey = 1:numel(files)
+            keys(iKey) = logFileSortKey(files(iKey));
+        end
+        [~, ord] = sort(keys, 'descend');
+        for iFile = ord(maxKeep+1:end)
+            try, delete(fullfile(files(iFile).folder, files(iFile).name)); catch, end
+        end
+    end
+    function key = logFileSortKey(fileInfo)
+        tok = regexp(fileInfo.name, '_(\d{8}_\d{6})', 'tokens', 'once');
+        if isempty(tok)
+            key = fileInfo.datenum;
+            return;
+        end
+        try
+            key = datenum(tok{1}, 'yyyymmdd_HHMMSS');
+        catch
+            key = fileInfo.datenum;
+        end
     end
 
 %% ── Figura ──────────────────────────────────────────────────────────────
@@ -122,9 +197,9 @@ fig.SizeChangedFcn = @onResize;
 %  índices fijos: 1=Maestro, 2-4=Esclavos, 5=Stream, 6=Log
 tabs = gobjects(6,1);
 tabs(1) = uitab(tg,'Title','Maestro');
-tabs(2) = uitab(tg,'Title','Esclavo 1');
-tabs(3) = uitab(tg,'Title','Esclavo 2');
-tabs(4) = uitab(tg,'Title','Esclavo 3');
+tabs(2) = uitab(tg,'Title',slaveTabTitle(2));
+tabs(3) = uitab(tg,'Title',slaveTabTitle(3));
+tabs(4) = uitab(tg,'Title',slaveTabTitle(4));
 tabs(5) = uitab(tg,'Title','Stream');
 tabs(6) = uitab(tg,'Title','Log');
 
@@ -133,6 +208,7 @@ for slv = 1:3, buildSlaveTab(slv+1, tabs(slv+1)); end
 buildStreamTab(tabs(5));
 buildLogTab(tabs(6));
 applyTabVisibility();
+updateDriftBatchVisibility();
 
 %% ── Plots ────────────────────────────────────────────────────────────────
 layoutFigure();
@@ -164,7 +240,7 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
             'ValueChangedFcn',@(cb,~)setDcRemove(1,cb.Value));
         uibutton(pF,'Text','Quitar filtro','Position',[90 10 84 22], ...
             'ButtonPushedFcn',@(~,~)removeFir(1));
-        lblFiltM = uilabel(pF,'Text','Sin filtro','Position',[180 10 W-185 20]);
+        lblFiltM = uilabel(pF,'Text',firStatusText(1),'Position',[180 10 W-185 20]);
         S.node(1).efFir    = efFirM;
         S.node(1).cbDC     = cbDCM;
         S.node(1).lblFiltSt= lblFiltM;
@@ -173,6 +249,27 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
         pS = uipanel(tab,'Title','Estadísticas','Position',[4 656 W 76]);
         S.node(1).lblStats   = uilabel(pS,'Text','Batches: 0','Position',[4 36 W-12 20]);
         S.node(1).lblLastVal = uilabel(pS,'Text','Último: --', 'Position',[4 10 W-12 20]);
+
+        % Punta de la maza
+        PUNTAS = {'gris','roja','marron','negra','MEZCLADO'};
+        pPt = uipanel(tab,'Title','Punta de la maza','Position',[4 578 W 74]);
+        uilabel(pPt,'Text','Tipo:','Position',[4 30 38 20]);
+        uidropdown(pPt,'Position',[46 30 W-54 22], ...
+            'Items',PUNTAS,'Value',S.hammerTip, ...
+            'ValueChangedFcn',@(dd,~)set_hammerTip(dd.Value));
+
+        % Cancelador 50 Hz — Maestro
+        pN = uipanel(tab,'Title','Cancelador 50 Hz','Position',[4 498 W 76]);
+        uicheckbox(pN,'Text','Activar','Position',[4 34 80 22], ...
+            'Value',S.node(1).notchEnabled, ...
+            'ValueChangedFcn',@(cb,~)onNotchToggle(1,cb.Value));
+        uilabel(pN,'Text','µ:','Position',[4 8 20 20]);
+        uieditfield(pN,'numeric','Position',[26 8 60 22], ...
+            'Value',S.node(1).notchMu, ...
+            'ValueChangedFcn',@(ef,~)onNotchMu(1,ef.Value));
+        uilabel(pN,'Text','Arm:','Position',[92 8 34 20]);
+        uispinner(pN,'Position',[128 8 W-132 22],'Value',S.node(1).notchHarm, ...
+            'Limits',[1 5],'ValueChangedFcn',@(sp,~)onNotchHarm(1,sp.Value));
     end
 
     function buildSlaveTab(ch, tab)
@@ -181,44 +278,44 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
 
         % VRef DC
         pV = uipanel(tab,'Title','VRef DC','Position',[4 720 W 178]);
-        uilabel(pV,'Text','VDAC byte:','Position',[4 140 68 20]);
-        efVdac = uieditfield(pV,'numeric','Position',[76 140 52 22], ...
+        uilabel(pV,'Text','ID:','Position',[4 146 22 20]);
+        uieditfield(pV,'text','Position',[30 146 98 22], ...
+            'Value',S.node(ch).slave_id, ...
+            'ValueChangedFcn',@(ef,~)setSlaveId(ch,ef.Value));
+        uilabel(pV,'Text','VDAC byte:','Position',[4 118 68 20]);
+        efVdac = uieditfield(pV,'numeric','Position',[76 118 90 22], ...
             'Value',S.node(ch).vdac_byte,'Limits',[0 255],'RoundFractionalValues',true, ...
-            'ValueChangedFcn',@(ef,~)onVdacEdit(ch,ef));
-        uilabel(pV,'Text','=','Position',[132 140 10 20]);
+            'ValueChangedFcn',@(ef,~)sendVdacByte(ch,ef.Value,ef,lblDacV));
         lblDacV = uilabel(pV,'Text',sprintf('%.3f V',S.node(ch).vdac_byte*VDAC_STEP), ...
-            'Position',[144 140 80 20]);
-        uilabel(pV,'Text','Target V:','Position',[4 112 58 20]);
-        efTgt = uieditfield(pV,'numeric','Position',[66 112 58 22],'Value',0.512);
-        uibutton(pV,'Text','Set', 'Position',[128 112 42 22], ...
-            'ButtonPushedFcn',@(~,~)sendVdacTarget(ch,efTgt.Value,efVdac,lblDacV));
-        uibutton(pV,'Text','−','Position',[174 112 26 22], ...
+            'Position',[172 118 104 20]);
+        uilabel(pV,'Text','Target V:','Position',[4 90 58 20]);
+        efTgt = uieditfield(pV,'numeric','Position',[66 90 100 22],'Value',0.512, ...
+            'ValueChangedFcn',@(ef,~)sendVdacTarget(ch,ef.Value,efVdac,lblDacV));
+        uibutton(pV,'Text','−','Position',[170 90 26 22], ...
             'ButtonPushedFcn',@(~,~)adjustVdac(ch,efVdac,lblDacV,-1));
-        uibutton(pV,'Text','+','Position',[202 112 26 22], ...
+        uibutton(pV,'Text','+','Position',[200 90 26 22], ...
             'ButtonPushedFcn',@(~,~)adjustVdac(ch,efVdac,lblDacV,+1));
-        uilabel(pV,'Text','PGAvdac:','Position',[4 84 58 20]);
-        ddPgaVdac = uidropdown(pV,'Position',[66 84 78 22],'Items',gains, ...
-            'Value',gains{S.node(ch).pgavdac+1}, ...
-            'ValueChangedFcn',@(dd,~)sendPgaVdac(ch,dd,gains));
-        uilabel(pV,'Text','Cal:','Position',[4 56 28 20]);
-        lblCalSt = uilabel(pV,'Text','Sin cal','Position',[36 56 W-44 20]);
-        uibutton(pV,'Text','Guardar cal','Position',[4 28 100 22], ...
+        lblPgaVdacSt = uilabel(pV,'Text', ...
+            sprintf('PGAvdac: %s (auto)', gains{S.node(ch).pgavdac+1}), ...
+            'Position',[4 62 W-8 20]);
+        uilabel(pV,'Text','PGA→VDAC:','Position',[4 36 76 20]);
+        lblCalSt = uilabel(pV,'Text',calStatusText(ch),'Position',[82 36 W-90 20]);
+        uibutton(pV,'Text','Guardar VDAC','Position',[4 8 104 22], ...
             'ButtonPushedFcn',@(~,~)saveCalForPGA(ch,lblCalSt));
-        uibutton(pV,'Text','Aplicar cal','Position',[108 28 90 22], ...
+        uibutton(pV,'Text','Aplicar VDAC','Position',[112 8 104 22], ...
             'ButtonPushedFcn',@(~,~)applyCal(ch));
-        S.node(ch).efVdac    = efVdac;
-        S.node(ch).lblDacV   = lblDacV;
-        S.node(ch).ddPgaVdac = ddPgaVdac;
-        S.node(ch).lblCalSt  = lblCalSt;
+        S.node(ch).efVdac       = efVdac;
+        S.node(ch).lblDacV      = lblDacV;
+        S.node(ch).lblPgaVdacSt = lblPgaVdacSt;
+        S.node(ch).lblCalSt     = lblCalSt;
 
         % PGA
         pP = uipanel(tab,'Title','Ganancia PGA','Position',[4 658 W 58]);
-        ddPga = uidropdown(pP,'Position',[4 14 90 22],'Items',gains, ...
-            'Value',gains{S.node(ch).pga_code+1});
-        uibutton(pP,'Text','Set PGA','Position',[98 14 66 22], ...
-            'ButtonPushedFcn',@(~,~)sendPga(ch,ddPga,gains));
+        ddPga = uidropdown(pP,'Position',[4 14 120 22],'Items',gains, ...
+            'Value',gains{S.node(ch).pga_code+1}, ...
+            'ValueChangedFcn',@(dd,~)sendPga(ch,dd,gains));
         lblPgaSt = uilabel(pP,'Text',sprintf('Actual: %s',gains{S.node(ch).pga_code+1}), ...
-            'Position',[170 14 W-176 22]);
+            'Position',[130 14 W-134 22]);
         S.node(ch).ddPga    = ddPga;
         S.node(ch).lblPgaSt = lblPgaSt;
 
@@ -233,13 +330,13 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
             'ValueChangedFcn',@(cb,~)setDcRemove(ch,cb.Value));
         uibutton(pF,'Text','Quitar filtro','Position',[90 12 84 22], ...
             'ButtonPushedFcn',@(~,~)removeFir(ch));
-        lblFiltSt = uilabel(pF,'Text','Sin filtro','Position',[180 12 W-188 20]);
+        lblFiltSt = uilabel(pF,'Text',firStatusText(ch),'Position',[180 12 W-188 20]);
         S.node(ch).efFir    = efFir;
         S.node(ch).cbDC     = cbDC;
         S.node(ch).lblFiltSt= lblFiltSt;
 
-        % Debug / Test
-        pD = uipanel(tab,'Title','Debug / Test','Position',[4 488 W 82]);
+        % Send
+        pD = uipanel(tab,'Title','Send','Position',[4 488 W 82]);
         btnTest = uibutton(pD,'Text',sprintf('Test Esclavo %d',ch-1), ...
             'Position',[4 46 130 26], ...
             'ButtonPushedFcn',@(~,~)onTestEsclavo(ch),'Enable','off');
@@ -247,8 +344,9 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
             'FontColor',[0.7 0.7 0.7],'FontSize',16);
         lblSaludTxt = uilabel(pD,'Text','Sin test','Position',[164 46 W-168 26]);
         uilabel(pD,'Text','TX Mode:','Position',[4 14 58 20]);
-        ddTX = uidropdown(pD,'Position',[66 14 96 22],'Items',{'Raw','Filtrado'}, ...
-            'ValueChangedFcn',@(dd,~)sendTxMode(ch,strcmp(dd.Value,'Filtrado')));
+        ddTX = uidropdown(pD,'Position',[66 14 W-70 22],'Items',TX_MODE_ITEMS, ...
+            'Value',txModeName(S.node(ch).tx_mode), ...
+            'ValueChangedFcn',@(dd,~)sendTxMode(ch,dd.Value));
         S.node(ch).btnTest     = btnTest;
         S.node(ch).lblSalud    = lblSalud;
         S.node(ch).lblSaludTxt = lblSaludTxt;
@@ -260,6 +358,35 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
             'Position',[4 40 W-12 20]);
         S.node(ch).lblLastVal = uilabel(pSt,'Text','Último: --', ...
             'Position',[4 14 W-12 20]);
+
+        % Cancelador 50 Hz — por esclavo
+        pN = uipanel(tab,'Title','Cancelador 50 Hz','Position',[4 316 W 82]);
+        uicheckbox(pN,'Text','Activar','Position',[4 38 80 22], ...
+            'Value',S.node(ch).notchEnabled, ...
+            'ValueChangedFcn',@(cb,~)onNotchToggle(ch,cb.Value));
+        uilabel(pN,'Text','µ:','Position',[4 10 20 20]);
+        uieditfield(pN,'numeric','Position',[26 10 60 22], ...
+            'Value',S.node(ch).notchMu, ...
+            'ValueChangedFcn',@(ef,~)onNotchMu(ch,ef.Value));
+        uilabel(pN,'Text','Arm:','Position',[92 10 34 20]);
+        uispinner(pN,'Position',[128 10 W-132 22],'Value',S.node(ch).notchHarm, ...
+            'Limits',[1 5],'ValueChangedFcn',@(sp,~)onNotchHarm(ch,sp.Value));
+
+        % Debug COM esclavo (opcional) — panel expandido para más log
+        pDbg = uipanel(tab,'Title',sprintf('Debug COM Esclavo %d (opcional)',ch-1), ...
+            'Position',[4 4 W 308]);
+        uilabel(pDbg,'Text','Puerto serial:','Position',[4 264 80 20]);
+        slvDd = uidropdown(pDbg,'Position',[88 262 W-160 22], ...
+            'Items',listSerialPorts());
+        uibutton(pDbg,'Text','↺','Position',[W-68 262 64 22], ...
+            'ButtonPushedFcn',@(~,~) set(slvDd,'Items',listSerialPorts()));
+        slvBtnC = uibutton(pDbg,'Text','Conectar', 'Position',[4  236 90   22]);
+        slvBtnD = uibutton(pDbg,'Text','Desconectar','Position',[98 236 W-102 22],'Enable','off');
+        slvBtnC.ButtonPushedFcn = @(~,~) connectDbg(false,  ch, slvDd, slvBtnC, slvBtnD);
+        slvBtnD.ButtonPushedFcn = @(~,~) disconnectDbg(false, ch, slvBtnC, slvBtnD);
+        slvTa = uitextarea(pDbg,'Position',[4 4 W-8 228], ...
+            'Editable','off','FontName','Courier New','FontSize',8);
+        S.node(ch).dbgTa = slvTa;
     end
 
     function buildStreamTab(tab)
@@ -268,7 +395,9 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
         % Conexión
         pC = uipanel(tab,'Title','Conexión USB','Position',[4 788 W 110]);
         uilabel(pC,'Text','Puerto:','Position',[4 72 46 20]);
-        ddPort = uidropdown(pC,'Position',[54 72 186 22],'Items',listSerialPorts());
+        portItems = listSerialPorts();
+        ddPort = uidropdown(pC,'Position',[54 72 186 22],'Items',portItems);
+        if any(strcmp(portItems, S.lastUsbPort)), ddPort.Value = S.lastUsbPort; end
         uibutton(pC,'Text','↺','Position',[244 72 W-248 22], ...
             'ButtonPushedFcn',@(~,~)refreshPorts());
         uilabel(pC,'Text','Esclavos:','Position',[4 44 62 20]);
@@ -284,32 +413,22 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
 
         % Sincronización
         pS = uipanel(tab,'Title','Sincronización','Position',[4 682 W 102]);
-        btnArm   = uibutton(pS,'Text','ARM',       'Position',[4  62 80 26], ...
+        btnArm  = uibutton(pS,'Text','ARM / Drift','Position',[4  62 W-8 26], ...
             'ButtonPushedFcn',@onArm,'Enable','off');
-        btnStart = uibutton(pS,'Text','SYNC START','Position',[88 62 112 26], ...
-            'ButtonPushedFcn',@onSyncStart,'Enable','off');
-        btnStop  = uibutton(pS,'Text','STOP',      'Position',[204 62 W-208 26], ...
-            'ButtonPushedFcn',@onSyncStop,'Enable','off');
         lblSyncSt = uilabel(pS,'Text','Estado: IDLE',      'Position',[4 36 W-8 20]);
         lblArmCnt = uilabel(pS,'Text','Esclavos listos: 0','Position',[4 12 W-8 20]);
 
         % Stream
-        pSt = uipanel(tab,'Title','Stream','Position',[4 568 W 110]);
-        btnStreamOn  = uibutton(pSt,'Text','▶ Iniciar','Position',[4  74 158 28], ...
+        pSt = uipanel(tab,'Title','Stream','Position',[4 588 W 90]);
+        btnStreamOn  = uibutton(pSt,'Text','▶ Iniciar','Position',[4  78 W-8 24], ...
             'ButtonPushedFcn',@onStreamOn,'Enable','off');
-        btnStreamOff = uibutton(pSt,'Text','■ Detener','Position',[166 74 W-170 28], ...
-            'ButtonPushedFcn',@onStreamOff,'Enable','off');
-        uibutton(pSt,'Text','Limpiar buffers','Position',[4 44 W-8 26], ...
+        uibutton(pSt,'Text','Limpiar buffers','Position',[4 54 W-8 20], ...
             'ButtonPushedFcn',@onClear);
-        cbLine  = uicheckbox(pSt,'Text','Cancelador 50 Hz','Position',[4 18 136 20], ...
-            'ValueChangedFcn',@onLineCancellerToggle);
-        uilabel(pSt,'Text','µ:','Position',[146 18 20 20]);
-        efMu    = uieditfield(pSt,'numeric','Position',[168 18 52 20],'Value',0.002);
-        uilabel(pSt,'Text','Arm:','Position',[226 18 32 20]);
-        spnHarm = uispinner(pSt,'Position',[260 18 W-264 20],'Value',3,'Limits',[1 5]);
+        uicheckbox(pSt,'Text','Debug','Position',[4 10 W-8 20], ...
+            'Value',S.streamDebug,'ValueChangedFcn',@(cb,~)onStreamDebugToggle(cb.Value));
 
         % Deriva
-        pDr = uipanel(tab,'Title','Deriva (µs)','Position',[4 464 W 100]);
+        pDr = uipanel(tab,'Title','Deriva (s, E)','Position',[4 464 W 100]);
         for k = 1:3
             driftLabels(k) = uilabel(pDr,'Text',sprintf('Esclavo %d: --',k), ...
                 'Position',[4 (3-k)*28+8 W-8 22]);
@@ -326,7 +445,7 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
         % Guardar
         pSv = uipanel(tab,'Title','Guardar','Position',[4 264 W 88]);
         uilabel(pSv,'Text','Nombre:','Position',[4 48 54 20]);
-        efSaveName = uieditfield(pSv,'text','Position',[62 48 154 22],'Value','muestra');
+        efSaveName = uieditfield(pSv,'text','Position',[62 48 154 22],'Value',S.saveBaseName);
         uibutton(pSv,'Text','Guardar .mat','Position',[220 48 W-224 22], ...
             'ButtonPushedFcn',@onSave);
         lblSaveSt = uilabel(pSv,'Text','','Position',[4 16 W-8 24], ...
@@ -337,9 +456,26 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
         for ch = 1:MAX_NODES
             cbVis(ch) = uicheckbox(pCh,'Text',NODE_NAMES{ch}, ...
                 'Position',[4 (MAX_NODES-ch)*22+8 W-8 20], ...
-                'Value',true, ...
+                'Value',S.node(ch).visible, ...
                 'ValueChangedFcn',@(src,~)onCheckboxChannel(ch,src.Value));
         end
+
+        % Datos
+        pDa = uipanel(tab,'Title','Datos','Position',[4 4 W 148]);
+        lblDatos = uilabel(pDa,'Text','Buf: 0 mts  |  Batches: 0', ...
+            'Position',[4 108 W-8 20]);
+        uilabel(pDa,'Text','Vista(s):','Position',[4 84 56 20]);
+        uispinner(pDa,'Position',[62 82 W-66 22], ...
+            'Value',DISP_SAMP/FS,'Limits',[1 10],'Step',1,'RoundFractionalValues',true, ...
+            'ValueChangedFcn',@(sp,~)onVistaSecs(sp.Value));
+        uilabel(pDa,'Text','Max buf(s):','Position',[4 58 70 20]);
+        uispinner(pDa,'Position',[76 56 W-80 22], ...
+            'Value',S.maxBuf/FS,'Limits',[5 60],'Step',5,'RoundFractionalValues',true, ...
+            'ValueChangedFcn',@(sp,~)onMaxBufSecs(sp.Value));
+        uilabel(pDa,'Text','Render ms:','Position',[4 32 60 20]);
+        uispinner(pDa,'Position',[66 30 W-70 22], ...
+            'Value',150,'Limits',[50 500],'Step',10,'RoundFractionalValues',true, ...
+            'ValueChangedFcn',@(sp,~)onRenderPeriod(sp.Value));
     end
 
     function buildLogTab(tab)
@@ -396,6 +532,20 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
         tg.SelectedTab = tabs(5);
         % Solo actualizar plots si ya fueron creados
         if isLiveHandle(S.node(1).ax), applyPlotVisibility(); end
+    end
+
+    function updateDriftBatchVisibility()
+        for k = 1:3
+            if isLiveHandle(driftLabels(k))
+                driftLabels(k).Visible = ternary(k <= S.nSlaves, 'on', 'off');
+            end
+        end
+        for ch = 1:MAX_NODES
+            if isLiveHandle(globalBatch(ch))
+                show = (ch == 1) || (ch <= 1 + S.nSlaves);
+                globalBatch(ch).Visible = ternary(show, 'on', 'off');
+            end
+        end
     end
 
     function applyPlotVisibility()
@@ -462,6 +612,7 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
         S.nSlaves = max(0, min(3, round(spnSlaves.Value)));
         spnSlaves.Value = S.nSlaves;
         applyTabVisibility();
+        updateDriftBatchVisibility();
         logH(sprintf('Esclavos: %d', S.nSlaves));
         logM(sprintf('nSlaves=%d', S.nSlaves));
     end
@@ -471,6 +622,7 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
         if isempty(portName) || strcmp(portName,'(sin puertos)')
             logH('Selecciona un puerto COM válido'); return;
         end
+        S.lastUsbPort = portName;
         try
             S.port = serialport(portName, BAUD);
             flush(S.port);
@@ -480,6 +632,14 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
             logM(['onConnect FAIL port=' portName ' ' ME.message]);
             return;
         end
+        % Enviar STOP al reconectar para que el maestro vuelva a IDLE
+        try
+            cs = bitxor(uint8(hex2dec('A4')), uint8(0));
+            write(S.port, uint8([CMD_HEADER, hex2dec('A4'), 0, cs]), 'uint8');
+            pause(0.15);
+            flush(S.port);
+            S.rxBuf = uint8([]);
+        catch, end
         lblConn.Text      = ['● Conectado: ' portName];
         lblConn.FontColor = [0.0 0.55 0.0];
         btnConnect.Enable = 'off';
@@ -492,12 +652,17 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
                 S.node(ch).btnTest.Enable = 'on';
             end
         end
-        % Crear timer si no existe o fue borrado
+        % Crear timers si no existen o fueron borrados
         if isempty(tmr) || ~isvalid(tmr)
             tmr = timer('ExecutionMode','fixedRate','Period',0.05, ...
                 'TimerFcn',@timerRX,'BusyMode','drop');
         end
         if strcmp(tmr.Running,'off'), start(tmr); end
+        if isempty(tmrRender) || ~isvalid(tmrRender)
+            tmrRender = timer('ExecutionMode','fixedRate','Period',0.15, ...
+                'TimerFcn',@timerRenderFcn,'BusyMode','drop');
+        end
+        if strcmp(tmrRender.Running,'off'), start(tmrRender); end
         logH(['Conectado: ' portName]);
         logM(sprintf('onConnect OK port=%s', portName));
     end
@@ -506,6 +671,11 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
         if ~isempty(tmr) && isvalid(tmr) && strcmp(tmr.Running,'on')
             stop(tmr);
         end
+        if ~isempty(tmrRender) && isvalid(tmrRender) && strcmp(tmrRender.Running,'on')
+            stop(tmrRender);
+        end
+        setDriftDebugSlaves(false);
+        setStreamDebugSignal(false);
         if ~isempty(S.port) && isvalid(S.port), delete(S.port); end
         S.port = [];
         lblConn.Text      = '● Sin conexión';
@@ -513,11 +683,11 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
         btnConnect.Enable = 'on';
         btnDisconn.Enable = 'off';
         btnArm.Enable     = 'off';
-        btnStart.Enable   = 'off';
-        btnStop.Enable    = 'off';
-        btnStreamOn.Enable   = 'off';
-        btnStreamOff.Enable  = 'off';
+        btnArm.Text       = 'ARM / Drift';
+        btnStreamOn.Enable= 'off';
+        btnStreamOn.Text  = '▶ Iniciar';
         btnTestMaestro.Enable= 'off';
+        S.armPending = false; S.armTimer = [];
         for ch = 2:MAX_NODES
             if isfield(S.node(ch),'btnTest') && ~isempty(S.node(ch).btnTest)
                 S.node(ch).btnTest.Enable = 'off';
@@ -532,42 +702,299 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
 %% ════════════════════════════════════════════════════════════════════════
 
     function onArm(~,~)
+        % Toggle: second press cancels
+        if S.armPending || S.driftMeasuring
+            cancelArmDrift();
+            return;
+        end
+        if S.nSlaves == 0, logH('Configura el nº de esclavos primero'); return; end
         psocCmd(hex2dec('A2'), S.nSlaves);
+        S.armPending = true;
         lblSyncSt.Text = 'Estado: ARMING...';
-        lblArmCnt.Text = 'Esclavos listos: 0';
-        btnStart.Enable = 'on';
-        logH(sprintf('ARM → %d esclavos', S.nSlaves));
+        btnArm.Text = 'Cancelar ARM';
+        logH(sprintf('ARM → buscando %d esclavos', S.nSlaves));
         logM(sprintf('CMD ARM n=%d', S.nSlaves));
+        tmrA = timer('StartDelay', 1.0, 'ExecutionMode', 'singleShot', 'TimerFcn', @armDone);
+        S.armTimer = tmrA;
+        start(tmrA);
+        function armDone(~,~)
+            try, delete(tmrA); catch, end
+            S.armTimer = [];
+            S.armPending = false;
+            if isLiveHandle(btnArm), btnArm.Text = 'ARM / Drift'; end
+            doDriftMeasure();
+        end
     end
 
-    function onSyncStart(~,~)
+    function cancelArmDrift()
+        if ~isempty(S.armTimer) && isvalid(S.armTimer)
+            try, stop(S.armTimer); delete(S.armTimer); catch, end
+        end
+        S.armTimer = [];
+        S.armPending = false;
+        S.driftMeasuring = false;
+        setDriftDebugSlaves(false);
+        try, psocCmd(hex2dec('A4'), 0); catch, end
+        try, psocCmd(hex2dec('A1'), 0); catch, end
+        S.streaming = false;
+        if isLiveHandle(btnArm),      btnArm.Text     = 'ARM / Drift'; end
+        if isLiveHandle(btnStreamOn), btnStreamOn.Text = '▶ Iniciar'; end
+        lblSyncSt.Text = 'Estado: IDLE';
+        logH('ARM/Drift cancelado'); logM('ARM cancel');
+    end
+
+    function onStop(~,~)
+        S.driftT0 = [];
+        setDriftDebugSlaves(false);
+        setStreamDebugSignal(false);
+        try, psocCmd(hex2dec('A4'), 0); catch, end
+        try, psocCmd(hex2dec('A1'), 0); catch, end
+        S.streaming = false;
+        if isLiveHandle(btnStreamOn), btnStreamOn.Text = '▶ Iniciar'; end
+        lblSyncSt.Text = 'Estado: IDLE';
+        logH('STOP'); logM('CMD STOP');
+    end
+
+    % ── Drift measurement cycle: START → 1.5 s → STOP → compute ────────────
+    function doDriftMeasure()
+        if S.driftMeasuring, return; end
+        if isempty(S.port) || ~isvalid(S.port), return; end
+        S.driftMeasuring = true;
+        % Activar stream brevemente para recibir muestras
+        psocCmd(hex2dec('A1'), 1);
+        S.streaming = true;
+        % Marcar tiempo y limpiar flags de primera muestra
+        S.driftT0 = tic;
+        for chD = 1:MAX_NODES
+            S.node(chD).gotFirst = false;
+            S.node(chD).tFirst   = 0;
+        end
         psocCmd(hex2dec('A3'), 0);
-        lblSyncSt.Text = 'Estado: RUNNING';
-        btnStop.Enable = 'on';
-        logH('SYNC START'); logM('CMD START');
+        setDriftDebugSlaves(true);
+        lblSyncSt.Text = 'Estado: Midiendo drift...';
+        logM('driftMeasure START');
+        tmrDM = timer('StartDelay', 1.5, 'ExecutionMode', 'singleShot', 'TimerFcn', @finishDrift);
+        start(tmrDM);
+        function finishDrift(~,~)
+            try, delete(tmrDM); catch, end
+            setDriftDebugSlaves(false);
+            try, psocCmd(hex2dec('A4'), 0); catch, end
+            try, psocCmd(hex2dec('A1'), 0); catch, end
+            S.streaming = false;
+            if ~isempty(S.driftT0), computeDrift(); end
+            S.driftMeasuring = false;
+            lblSyncSt.Text = 'Estado: ARMED';
+            logM('driftMeasure STOP');
+        end
     end
 
-    function onSyncStop(~,~)
-        psocCmd(hex2dec('A4'), 0);
-        lblSyncSt.Text = 'Estado: STOPPING';
-        btnStop.Enable = 'off';
-        logH('SYNC STOP'); logM('CMD STOP');
+    function setDriftDebugSlaves(enable)
+        if isempty(S.port) || ~isvalid(S.port), S.driftDebugActive = false; return; end
+        if S.nSlaves == 0, S.driftDebugActive = false; return; end
+        for chDbg = 2:1+S.nSlaves
+            try, enviarDirigido(chDbg, hex2dec('A7'), uint8(enable)); catch, end
+        end
+        S.driftDebugActive = logical(enable);
+        logM(sprintf('driftMeasure slaveDebug=%d', uint8(enable)));
+    end
+
+    function computeDrift()
+        if S.nSlaves == 0, S.driftT0 = []; return; end
+        times = zeros(1, S.nSlaves);
+        anyData = false;
+        for k = 1:S.nSlaves
+            ch = k + 1;
+            if S.node(ch).gotFirst
+                times(k) = S.node(ch).tFirst;
+                anyData = true;
+            else
+                times(k) = NaN;
+            end
+        end
+        S.driftT0 = [];
+        if ~anyData, logH('Drift: sin datos de esclavos'); return; end
+        if S.node(1).gotFirst
+            refTime = S.node(1).tFirst;
+            refName = 'M';
+        else
+            refTime = 0;
+            refName = 'START';
+        end
+        parts = {};
+        for k = 1:S.nSlaves
+            ch = k + 1;
+            if ~isnan(times(k))
+                d = times(k) - refTime;
+                S.node(ch).driftHist(end+1) = d;
+                if length(S.node(ch).driftHist) > 50
+                    S.node(ch).driftHist = S.node(ch).driftHist(end-49:end);
+                end
+                updateStats(ch);
+                parts{end+1} = sprintf('S%d=%s', k, formatDriftScalar(d)); %#ok
+            end
+        end
+        logH(sprintf('Drift ref=%s: %s', refName, strjoin(parts, '  ')));
+        logM(sprintf('drift ref=%s M=%s %s', refName, ...
+            formatDriftScalar(S.node(1).tFirst), strjoin(parts, ' ')));
     end
 
     function onStreamOn(~,~)
-        psocCmd(hex2dec('A1'), 1);
-        S.streaming = true;
-        btnStreamOn.Enable  = 'off';
-        btnStreamOff.Enable = 'on';
-        logH('Stream iniciado'); logM('STREAM ON');
+        if S.streaming
+            onStreamOff();
+            return;
+        end
+        if S.nSlaves == 0
+            logH('Configura el nº de esclavos primero'); return;
+        end
+        % ARM → esperar 1.5 s → START + stream real
+        psocCmd(hex2dec('A2'), S.nSlaves);
+        lblSyncSt.Text = 'Estado: ARMING...';
+        btnStreamOn.Text = '■ Detener';
+        logH('Stream: ARM enviado'); logM('streamOn ARM');
+        tmrSO = timer('StartDelay',1.5,'ExecutionMode','singleShot','TimerFcn',@doStreamStart);
+        start(tmrSO);
+        function doStreamStart(~,~)
+            try, delete(tmrSO); catch, end
+            % Marcar t0 para drift de primera muestra
+            S.driftT0 = tic;
+            for chSO = 1:MAX_NODES
+                S.node(chSO).gotFirst = false;
+                S.node(chSO).tFirst   = 0;
+            end
+            % Debug ANTES de START para que esclavos ya estén en modo fake al recibir flanco
+            if S.streamDebug
+                setStreamDebugSignal(true);
+            end
+            psocCmd(hex2dec('A1'), 1);
+            psocCmd(hex2dec('A3'), 0);
+            S.streaming = true;
+            lblSyncSt.Text = 'Estado: RUNNING';
+            logH('Stream RUNNING'); logM(sprintf('STREAM ON debug=%d', uint8(S.streamDebug)));
+        end
     end
 
     function onStreamOff(~,~)
-        psocCmd(hex2dec('A1'), 0);
+        setStreamDebugSignal(false);
+        try, psocCmd(hex2dec('A4'), 0); catch, end
+        try, psocCmd(hex2dec('A1'), 0); catch, end
         S.streaming = false;
-        btnStreamOn.Enable  = 'on';
-        btnStreamOff.Enable = 'off';
+        S.driftT0   = [];
+        if isLiveHandle(btnStreamOn), btnStreamOn.Text = '▶ Iniciar'; end
+        lblSyncSt.Text = 'Estado: IDLE';
         logH('Stream detenido'); logM('STREAM OFF');
+    end
+
+    function onStreamDebugToggle(val)
+        S.streamDebug = logical(val);
+        logM(sprintf('streamDebug=%d', uint8(S.streamDebug)));
+        if S.streaming
+            setStreamDebugSignal(S.streamDebug);
+        end
+    end
+
+    function onVistaSecs(val)
+        v = max(1, min(10, round(val)));
+        DISP_SAMP = FS * v;
+        logM(sprintf('dispSecs=%d DISP_SAMP=%d', v, DISP_SAMP));
+    end
+
+    function onMaxBufSecs(val)
+        v = max(5, min(60, round(val / 5) * 5));
+        S.maxBuf = FS * v;
+        logM(sprintf('maxBufSecs=%d maxBuf=%d', v, S.maxBuf));
+    end
+
+    function onRenderPeriod(val)
+        ms = max(50, min(500, round(val / 10) * 10));
+        if ~isempty(tmrRender) && isvalid(tmrRender)
+            wasOn = strcmp(tmrRender.Running, 'on');
+            if wasOn, stop(tmrRender); end
+            tmrRender.Period = ms / 1000;
+            if wasOn, start(tmrRender); end
+        end
+        logM(sprintf('renderPeriod=%dms', ms));
+    end
+
+    function setStreamDebugSignal(enable)
+        if isempty(S.port) || ~isvalid(S.port)
+            S.streamDebugActive = false;
+            return;
+        end
+        if ~enable && ~S.streamDebugActive
+            return;
+        end
+        try, psocCmd(hex2dec('A7'), uint8(enable)); catch, end
+        if enable
+            lastDebugCh = 1 + S.nSlaves;
+        else
+            lastDebugCh = MAX_NODES;
+        end
+        for chDbg = 2:lastDebugCh
+            try, enviarDirigido(chDbg, hex2dec('A7'), uint8(enable)); catch, end
+        end
+        S.streamDebugActive = logical(enable);
+        logM(sprintf('streamDebugSignal=%d', uint8(enable)));
+    end
+
+    function registerPending(ch, sub_cmd, param)
+        if ch < 2 || ch > MAX_NODES, return; end
+        p = S.node(ch).pending;
+        idx = find(p.sub_cmds == sub_cmd, 1);
+        if isempty(idx)
+            p.sub_cmds(end+1) = sub_cmd;
+            p.params(end+1)   = param;
+            p.times(end+1)    = tic;
+            p.retries(end+1)  = 0;
+        else
+            p.params(idx)  = param;
+            p.times(idx)   = tic;
+            p.retries(idx) = 0;
+        end
+        S.node(ch).pending = p;
+    end
+
+    function clearPending(ch, sub_cmd)
+        if ch < 2 || ch > MAX_NODES, return; end
+        p = S.node(ch).pending;
+        keep = p.sub_cmds ~= sub_cmd;
+        p.sub_cmds = p.sub_cmds(keep);
+        p.params   = p.params(keep);
+        p.times    = p.times(keep);
+        p.retries  = p.retries(keep);
+        S.node(ch).pending = p;
+    end
+
+    function checkRetries()
+        if isempty(S.port) || ~isvalid(S.port), return; end
+        MAX_RETRIES = 3;
+        RETRY_SEC   = 1.5;
+        for ch = 2:MAX_NODES
+            p = S.node(ch).pending;
+            if isempty(p.sub_cmds), continue; end
+            for i = 1:numel(p.sub_cmds)
+                if toc(p.times(i)) >= RETRY_SEC
+                    if p.retries(i) < MAX_RETRIES
+                        enviarDirigido(ch, p.sub_cmds(i), p.params(i));
+                        p.retries(i) = p.retries(i) + 1;
+                        p.times(i)   = tic;
+                        logM(sprintf('retry ch=%d sub=0x%02X param=%d attempt=%d', ...
+                            ch-1, p.sub_cmds(i), p.params(i), p.retries(i)));
+                    else
+                        logH(sprintf('%s: sin ACK sub=0x%02X tras %d reintentos', ...
+                            nodeDisplayName(ch), p.sub_cmds(i), MAX_RETRIES));
+                        % Marcar para borrar este pendiente agotado
+                        p.retries(i) = MAX_RETRIES + 1;
+                    end
+                end
+            end
+            % Limpiar entradas agotadas
+            keep = p.retries <= MAX_RETRIES;
+            p.sub_cmds = p.sub_cmds(keep);
+            p.params   = p.params(keep);
+            p.times    = p.times(keep);
+            p.retries  = p.retries(keep);
+            S.node(ch).pending = p;
+        end
     end
 
     function onClear(~,~)
@@ -587,11 +1014,18 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
         logH('Buffers limpiados'); logM('CLEAR');
     end
 
-    function onLineCancellerToggle(cb,~)
-        if ~cb.Value
-            for ch = 1:MAX_NODES, S.node(ch).lineW = []; end
-        end
-        logM(sprintf('cancelador50=%d', cb.Value));
+    function onNotchToggle(ch, val)
+        S.node(ch).notchEnabled = val;
+        if ~val, S.node(ch).lineW = []; end
+        logM(sprintf('notch ch=%d enabled=%d', ch-1, val));
+    end
+
+    function onNotchMu(ch, val)
+        S.node(ch).notchMu = val;
+    end
+
+    function onNotchHarm(ch, val)
+        S.node(ch).notchHarm = max(1, min(5, round(val)));
     end
 
 %% ════════════════════════════════════════════════════════════════════════
@@ -607,14 +1041,14 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
         lblMaestroTxt.Text = 'Probando...';
         logM('testMaestro START debug ON');
         init0 = S.node(1).batchCount;
-        tmrT  = timer('StartDelay',3,'ExecutionMode','singleShot','TimerFcn',@ck);
+        tmrT  = timer('StartDelay',1,'ExecutionMode','singleShot','TimerFcn',@ck);
         start(tmrT);
         function ck(~,~)
             try, psocCmd(hex2dec('A7'), 0); catch, end
             try, timerRX([],[]); catch, end
             S.streaming = false;
             g  = S.node(1).batchCount - init0;
-            ok = g >= 10;   % ~4000 Hz × 3 s → esperar al menos 10 muestras
+            ok = g >= 3;
             if ok
                 lblMaestroInd.FontColor = [0.0 0.7 0.0];
                 lblMaestroTxt.Text = sprintf('OK (%d muestras)',g);
@@ -635,14 +1069,12 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
         if ~wasStreaming
             psocCmd(hex2dec('A1'), 1);
             S.streaming = true;
-            if isLiveHandle(btnStreamOn),  btnStreamOn.Enable  = 'off'; end
-            if isLiveHandle(btnStreamOff), btnStreamOff.Enable = 'on';  end
         end
         enviarDirigido(ch, hex2dec('A7'), 1);
         init0 = S.node(ch).batchCount;
         S.node(ch).lblSalud.FontColor   = [0.8 0.6 0.0];
         S.node(ch).lblSaludTxt.Text     = 'Probando...';
-        tmrS = timer('StartDelay',4,'ExecutionMode','singleShot','TimerFcn',@ck);
+        tmrS = timer('StartDelay',1.5,'ExecutionMode','singleShot','TimerFcn',@ck);
         start(tmrS);
         function ck(~,~)
             try, enviarDirigido(ch, hex2dec('A7'), 0); catch, end
@@ -650,11 +1082,9 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
             if ~wasStreaming
                 try, psocCmd(hex2dec('A1'), 0); catch, end
                 S.streaming = false;
-                if isLiveHandle(btnStreamOn),  btnStreamOn.Enable  = 'on';  end
-                if isLiveHandle(btnStreamOff), btnStreamOff.Enable = 'off'; end
             end
             g  = S.node(ch).batchCount - init0;
-            ok = g >= 10;
+            ok = g >= 3;
             S.node(ch).salud = 1 + ~ok;
             if ok
                 S.node(ch).lblSalud.FontColor   = [0.0 0.7 0.0];
@@ -674,58 +1104,107 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
 %%  Callbacks — VRef DC (solo esclavos)
 %% ════════════════════════════════════════════════════════════════════════
 
-    function onVdacEdit(ch, ef)
-        S.node(ch).vdac_byte = ef.Value;
-        if ~isempty(S.node(ch).lblDacV)
-            S.node(ch).lblDacV.Text = sprintf('%.3f V', ef.Value*VDAC_STEP);
+    function sendVdacByte(ch, byte, efVdac, lblDacV)
+        byte = max(0, min(255, round(byte)));
+        if byte == S.node(ch).vdac_byte && ~isempty(S.node(ch).pending.sub_cmds) && ...
+                any(S.node(ch).pending.sub_cmds == hex2dec('AA'))
+            return;  % valor sin cambio y ya hay pending
         end
+        S.node(ch).vdac_byte = byte;
+        if nargin >= 3 && isLiveHandle(efVdac), efVdac.Value = byte; end
+        if nargin >= 4 && isLiveHandle(lblDacV)
+            lblDacV.Text = sprintf('%.3f V', byte*VDAC_STEP);
+        end
+        enviarDirigido(ch, hex2dec('AA'), byte);
+        registerPending(ch, hex2dec('AA'), byte);
+        logH(sprintf('%s VDAC→%d (%.3fV)', nodeDisplayName(ch), byte, byte*VDAC_STEP));
+        logM(sprintf('VDAC ch=%d byte=%d volts=%.3f', ch-1, byte, byte*VDAC_STEP));
+    end
+
+    function [vbyte, pcode] = calcVdacSetting(targetV)
+        gain_vals = [1, 2, 4, 5, 8, 10, 16, 32, 50];
+        MAX_VDAC_V = 255 * VDAC_STEP;
+        targetV = max(0, targetV);
+        min_gain = targetV / MAX_VDAC_V;
+        valid = gain_vals(gain_vals >= min_gain);
+        if isempty(valid)
+            pcode = numel(gain_vals) - 1;
+            g = gain_vals(end);
+        else
+            pcode = find(gain_vals == valid(1), 1) - 1;
+            g = valid(1);
+        end
+        vbyte = min(255, max(0, round(targetV / g / VDAC_STEP)));
     end
 
     function sendVdacTarget(ch, targetV, efVdac, lblDacV)
-        byte = max(0, min(255, round(targetV/VDAC_STEP)));
-        efVdac.Value = byte; lblDacV.Text = sprintf('%.3f V',byte*VDAC_STEP);
-        S.node(ch).vdac_byte = byte;
-        enviarDirigido(ch, hex2dec('AA'), byte);
-        logH(sprintf('Nodo %d VDAC→%d (%.3fV)',ch-1,byte,byte*VDAC_STEP));
+        gains = {'1x','2x','4x','5x','8x','10x','16x','32x','50x'};
+        [byte, pcode] = calcVdacSetting(targetV);
+        if pcode ~= S.node(ch).pgavdac
+            S.node(ch).pgavdac = pcode;
+            enviarDirigido(ch, hex2dec('A9'), pcode);
+            registerPending(ch, hex2dec('A9'), pcode);
+            if isLiveHandle(S.node(ch).lblPgaVdacSt)
+                S.node(ch).lblPgaVdacSt.Text = sprintf('PGAvdac: %s (auto)', gains{pcode+1});
+            end
+            logH(sprintf('%s PGAvdac→%s (auto)', nodeDisplayName(ch), gains{pcode+1}));
+        end
+        sendVdacByte(ch, byte, efVdac, lblDacV);
     end
 
     function adjustVdac(ch, efVdac, lblDacV, delta)
-        v = max(0, min(255, efVdac.Value + delta));
-        efVdac.Value = v; lblDacV.Text = sprintf('%.3f V',v*VDAC_STEP);
-        S.node(ch).vdac_byte = v;
-        enviarDirigido(ch, hex2dec('AA'), v);
+        gain_vals = [1, 2, 4, 5, 8, 10, 16, 32, 50];
+        cur_gain = gain_vals(S.node(ch).pgavdac + 1);
+        V_cur = double(S.node(ch).vdac_byte) * VDAC_STEP * cur_gain;
+        V_new = max(0, V_cur + delta * VDAC_STEP * cur_gain);
+        sendVdacTarget(ch, V_new, efVdac, lblDacV);
     end
 
     function sendPgaVdac(ch, dd, gains)
         code = find(strcmp(gains,dd.Value)) - 1;
         S.node(ch).pgavdac = code;
         enviarDirigido(ch, hex2dec('A9'), code);
+        registerPending(ch, hex2dec('A9'), code);
         logH(sprintf('Nodo %d PGAvdac→%s',ch-1,dd.Value));
     end
 
     function sendPga(ch, dd, gains)
         code = find(strcmp(gains,dd.Value)) - 1;
+        if code == S.node(ch).pga_code, return; end
         S.node(ch).pga_code = code;
         S.node(ch).lblPgaSt.Text = sprintf('Actual: %s',dd.Value);
+        if isLiveHandle(S.node(ch).lblCalSt), S.node(ch).lblCalSt.Text = calStatusText(ch); end
         enviarDirigido(ch, hex2dec('A6'), code);
+        registerPending(ch, hex2dec('A6'), code);
         logH(sprintf('Nodo %d PGA→%s',ch-1,dd.Value));
     end
 
     function saveCalForPGA(ch, lblCalSt)
-        if isempty(S.node(ch).notchBuf), logH('Sin datos'); return; end
         code = S.node(ch).pga_code;
-        dc   = mean(S.node(ch).notchBuf(max(1,end-FS+1):end));
+        if isempty(S.node(ch).notchBuf)
+            dc = NaN;
+        else
+            dc = mean(S.node(ch).notchBuf(max(1,end-FS+1):end));
+        end
         S.node(ch).cal(code+1,:) = [code, S.node(ch).vdac_byte, dc];
-        lblCalSt.Text = sprintf('Cal PGA%d: VDAC=%d',code,S.node(ch).vdac_byte);
-        logH(sprintf('Cal nodo %d PGA%d guardada',ch-1,code));
+        S.node(ch).calValid(code+1) = true;
+        lblCalSt.Text = calStatusText(ch);
+        logH(sprintf('%s: guardado PGA %s → VDAC %d', ...
+            nodeDisplayName(ch), pgaGainName(code), S.node(ch).vdac_byte));
     end
 
     function applyCal(ch)
         code = S.node(ch).pga_code;
         row  = S.node(ch).cal(code+1,:);
-        if row(2)==0, logH('Sin cal para esta PGA'); return; end
-        enviarDirigido(ch, hex2dec('AA'), row(2));
-        logH(sprintf('Cal aplicada nodo %d VDAC=%d',ch-1,row(2)));
+        if ~S.node(ch).calValid(code+1)
+            logH(sprintf('%s: sin VDAC guardado para PGA %s', ...
+                nodeDisplayName(ch), pgaGainName(code)));
+            return;
+        end
+        sendVdacByte(ch, row(2), S.node(ch).efVdac, S.node(ch).lblDacV);
+        if isLiveHandle(S.node(ch).lblCalSt), S.node(ch).lblCalSt.Text = calStatusText(ch); end
+        logH(sprintf('%s: aplicado PGA %s → VDAC %d', ...
+            nodeDisplayName(ch), pgaGainName(code), row(2)));
     end
 
 %% ════════════════════════════════════════════════════════════════════════
@@ -759,9 +1238,20 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
 
     function setDcRemove(ch, val), S.node(ch).dcRemove = val; end
 
-    function sendTxMode(ch, filtrado)
-        enviarDirigido(ch, hex2dec('A8'), uint8(filtrado));
-        logH(sprintf('Nodo %d TX→%s',ch-1,ternary(filtrado,'Filtrado','Raw')));
+    function set_hammerTip(val), S.hammerTip = val; end
+
+    function sendTxMode(ch, modeName)
+        mode = txModeCode(modeName);
+        if mode == S.node(ch).tx_mode, return; end
+        S.node(ch).tx_mode = mode;
+        if S.node(ch).debugActive
+            try, enviarDirigido(ch, hex2dec('A7'), 0); catch, end
+            S.node(ch).debugActive = false;
+        end
+        enviarDirigido(ch, hex2dec('A8'), mode);
+        registerPending(ch, hex2dec('A8'), mode);
+        logH(sprintf('%s TX→%s', nodeDisplayName(ch), txModeName(mode)));
+        logM(sprintf('TX mode ch=%d mode=%s code=%d',ch-1,txModeName(mode),mode));
     end
 
 %% ════════════════════════════════════════════════════════════════════════
@@ -778,13 +1268,14 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
 %% ════════════════════════════════════════════════════════════════════════
 
     function timerRX(~,~)
+        try, checkRetries(); catch, end
+        pollAllDbg();
         if isempty(S.port) || ~isvalid(S.port), return; end
         try
             n = S.port.NumBytesAvailable;
             if n > 0, S.rxBuf = [S.rxBuf, read(S.port,n,'uint8')]; end
         catch; return; end
 
-        changedChannels = false(1, MAX_NODES);
         while length(S.rxBuf) >= 6
             idx = find(S.rxBuf == PKT_HEADER, 1);
             if isempty(idx), S.rxBuf = uint8([]); break; end
@@ -792,14 +1283,29 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
             if length(S.rxBuf) < 6, break; end
             changedCh = decodePkt(S.rxBuf(1:6));
             if changedCh >= 1 && changedCh <= MAX_NODES
-                changedChannels(changedCh) = true;
+                S.renderDirty(changedCh) = true;
             end
-            S.rxBuf  = S.rxBuf(7:end);
+            S.rxBuf = S.rxBuf(7:end);
         end
-        for chUpd = find(changedChannels)
+    end
+
+    function timerRenderFcn(~,~)
+        dirty = S.renderDirty;
+        S.renderDirty(:) = false;
+        for chUpd = find(dirty)
             updatePlot(chUpd);
         end
-        if any(changedChannels), drawnow limitrate; end
+        if any(dirty)
+            drawnow limitrate;
+            if isLiveHandle(lblDatos)
+                totalSamp = 0;
+                for ccc = 1:MAX_NODES
+                    totalSamp = totalSamp + length(S.node(ccc).notchBuf);
+                end
+                totalBatch = sum([S.node.batchCount]);
+                lblDatos.Text = sprintf('Buf: %d mts  |  Batches: %d', totalSamp, totalBatch);
+            end
+        end
     end
 
     function changedCh = decodePkt(pkt)
@@ -807,6 +1313,16 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
         node_id = double(pkt(2));
         typ     = double(pkt(3));
         b2=double(pkt(4)); b1=double(pkt(5)); b0=double(pkt(6));
+
+        % 0xFD — diagnóstico: master status o HELLO de esclavo
+        if typ == 253
+            if node_id == 255
+                logH(sprintf('Master: ESP-NOW=%s  ch=%d', ternary(b2==1,'OK','FAIL'), b1));
+            else
+                logM(sprintf('HELLO node=%d', node_id));
+            end
+            return;
+        end
 
         % node_id 0xFF = mensaje global del maestro → tratar como nodo 0
         if node_id == 255
@@ -834,6 +1350,9 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
             case 7    % ACK [cmd, val, 0]
                 logH(sprintf('ACK nodo=%d cmd=0x%02X val=%d',node_id,b2,b1));
                 logM(sprintf('ACK ch=%d cmd=0x%02X val=%d',node_id,b2,b1));
+                if ch >= 2 && ch <= MAX_NODES
+                    clearPending(ch, b2);
+                end
 
             case 254  % READY (0xFE)
                 lblArmCnt.Text = sprintf('Esclavos listos: %d',b2);
@@ -846,14 +1365,23 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
     function appendSample(ch, val)
         S.node(ch).notchBuf(end+1) = double(val);
         S.node(ch).batchCount = S.node(ch).batchCount + 1;
-        if length(S.node(ch).notchBuf) > DISP_SAMP
-            S.node(ch).notchBuf = S.node(ch).notchBuf(end-DISP_SAMP+1:end);
+        % Registrar tiempo de primera muestra (para estimación de drift)
+        if ch <= 1 + S.nSlaves && ~isempty(S.driftT0) && ~S.node(ch).gotFirst
+            S.node(ch).gotFirst = true;
+            S.node(ch).tFirst   = toc(S.driftT0) * 1e6;   % µs desde START
+            activeDriftCh = 1:(1 + S.nSlaves);
+            if all([S.node(activeDriftCh).gotFirst])
+                computeDrift();
+            end
         end
-        % Cancelador 50 Hz
-        if cbLine.Value
+        if length(S.node(ch).notchBuf) > S.maxBuf
+            S.node(ch).notchBuf = S.node(ch).notchBuf(end-S.maxBuf+1:end);
+        end
+        % Cancelador 50 Hz (por nodo)
+        if S.node(ch).notchEnabled
             [sv, S.node(ch).lineW] = lineCanceller(S.node(ch).notchBuf(end), ...
                 S.node(ch).lineW, S.node(ch).batchCount, FS, 50, ...
-                spnHarm.Value, efMu.Value);
+                S.node(ch).notchHarm, S.node(ch).notchMu);
             S.node(ch).notchBuf(end) = sv;
         end
         % FIR incremental
@@ -861,8 +1389,8 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
             [fv, S.node(ch).filtZi] = filter(S.node(ch).filtB,1, ...
                 S.node(ch).notchBuf(end), S.node(ch).filtZi);
             S.node(ch).filtBuf(end+1) = fv;
-            if length(S.node(ch).filtBuf) > DISP_SAMP
-                S.node(ch).filtBuf = S.node(ch).filtBuf(end-DISP_SAMP+1:end);
+            if length(S.node(ch).filtBuf) > S.maxBuf
+                S.node(ch).filtBuf = S.node(ch).filtBuf(end-S.maxBuf+1:end);
             end
         end
         % Stats cada 200 muestras
@@ -873,12 +1401,18 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
         if ~S.node(ch).visible || ~isLiveHandle(S.node(ch).ax), return; end
         raw = S.node(ch).notchBuf;
         if isempty(raw), return; end
+        if length(raw) > DISP_SAMP
+            raw = raw(end-DISP_SAMP+1:end);
+        end
         y = raw;
         if S.node(ch).dcRemove, y = raw - mean(raw); end
         S.node(ch).hRaw.XData = 1:length(y);
         S.node(ch).hRaw.YData = y;
         if ~isempty(S.node(ch).filtBuf)
             fb = S.node(ch).filtBuf;
+            if length(fb) > DISP_SAMP
+                fb = fb(end-DISP_SAMP+1:end);
+            end
             S.node(ch).hFilt.XData = 1:length(fb);
             S.node(ch).hFilt.YData = fb;
         end
@@ -887,8 +1421,7 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
     function updateStats(ch)
         dStr = '--';
         if ~isempty(S.node(ch).driftHist)
-            dStr = sprintf('%.1f±%.1f µs', ...
-                mean(S.node(ch).driftHist), std(S.node(ch).driftHist));
+            dStr = formatDriftStats(S.node(ch).driftHist);
         end
         if isLiveHandle(S.node(ch).lblStats)
             S.node(ch).lblStats.Text = sprintf('Batches: %d  Drift: %s', ...
@@ -902,8 +1435,240 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
             globalBatch(ch).Text = sprintf('%s: %d', NODE_NAMES{ch}, S.node(ch).batchCount);
         end
         if ch >= 2 && isLiveHandle(driftLabels(ch-1)) && ~isempty(S.node(ch).driftHist)
-            driftLabels(ch-1).Text = sprintf('Esclavo %d: %.1f±%.1f µs', ...
-                ch-1, mean(S.node(ch).driftHist), std(S.node(ch).driftHist));
+            driftLabels(ch-1).Text = sprintf('Esclavo %d: %s', ...
+                ch-1, formatDriftStats(S.node(ch).driftHist));
+        end
+    end
+
+    function s = formatDriftScalar(valueUs)
+        if isempty(valueUs) || isnan(valueUs)
+            s = '--';
+            return;
+        end
+        s = sprintf('%.6E s', valueUs * 1e-6);
+    end
+
+    function s = formatDriftStats(valuesUs)
+        mu = mean(valuesUs);
+        sig = std(valuesUs);
+        s = sprintf('%.6E±%.6E s', mu * 1e-6, sig * 1e-6);
+    end
+
+    function appCfg = makeConfigSnapshot()
+        appCfg.version = 3;
+        appCfg.saved_at = datestr(now);
+        appCfg.fs = FS;
+        appCfg.max_nodes = MAX_NODES;
+        appCfg.vdac_step_volts = VDAC_STEP;
+        appCfg.node_names = NODE_NAMES;
+        appCfg.tx_mode_items = TX_MODE_ITEMS;
+        appCfg.nSlaves = S.nSlaves;
+        appCfg.hammer_tip = S.hammerTip;
+        appCfg.stream_debug = S.streamDebug;
+        appCfg.plot_visible = [S.node.visible];
+        if isLiveHandle(efSaveName)
+            appCfg.save_basename = efSaveName.Value;
+        else
+            appCfg.save_basename = S.saveBaseName;
+        end
+        if isLiveHandle(ddPort)
+            appCfg.last_usb_port = ddPort.Value;
+        else
+            appCfg.last_usb_port = S.lastUsbPort;
+        end
+        for chCfg = 1:MAX_NODES
+            appCfg.node(chCfg) = makeNodeConfigSnapshot(chCfg); %#ok<AGROW>
+        end
+        appCfg.hammer = appCfg.node(1);
+        if S.nSlaves > 0
+            appCfg.slave = appCfg.node(2:1+S.nSlaves);
+        else
+            appCfg.slave = struct([]);
+        end
+    end
+
+    function nodeCfg = makeNodeConfigSnapshot(chCfg)
+        nodeCfg.node_id = chCfg - 1;
+        nodeCfg.name = nodeDisplayName(chCfg);
+        nodeCfg.default_name = NODE_NAMES{chCfg};
+        nodeCfg.slave_id = S.node(chCfg).slave_id;
+        nodeCfg.is_master = (chCfg == 1);
+        nodeCfg.is_active = (chCfg == 1) || (chCfg <= 1 + S.nSlaves);
+        nodeCfg.visible = S.node(chCfg).visible;
+        nodeCfg.pga_code = S.node(chCfg).pga_code;
+        nodeCfg.pga_gain = pgaGainName(S.node(chCfg).pga_code);
+        nodeCfg.vdac_byte = S.node(chCfg).vdac_byte;
+        nodeCfg.vdac_volts = S.node(chCfg).vdac_byte * VDAC_STEP;
+        nodeCfg.pgavdac = S.node(chCfg).pgavdac;
+        nodeCfg.pgavdac_gain = pgaGainName(S.node(chCfg).pgavdac);
+        nodeCfg.calibration = S.node(chCfg).cal;
+        nodeCfg.calibration_valid = S.node(chCfg).calValid;
+        nodeCfg.fir_cmd = S.node(chCfg).filtCmd;
+        nodeCfg.fir_coeffs = S.node(chCfg).filtB;
+        nodeCfg.fir_enabled = ~isempty(S.node(chCfg).filtB);
+        nodeCfg.dc_remove = S.node(chCfg).dcRemove;
+        nodeCfg.notch_enabled = S.node(chCfg).notchEnabled;
+        nodeCfg.notch_mu = S.node(chCfg).notchMu;
+        nodeCfg.notch_harmonics = S.node(chCfg).notchHarm;
+        nodeCfg.tx_mode = uint8(txModeCode(S.node(chCfg).tx_mode));
+        nodeCfg.tx_mode_name = txModeName(S.node(chCfg).tx_mode);
+        nodeCfg.debug_on_start = (nodeCfg.tx_mode == TX_DEBUG);
+    end
+
+    function applyConfigSnapshot(appCfg)
+        if isfield(appCfg,'nSlaves'), S.nSlaves = max(0, min(3, round(appCfg.nSlaves))); end
+        if isfield(appCfg,'hammer_tip'), S.hammerTip = appCfg.hammer_tip; end
+        if isfield(appCfg,'stream_debug'), S.streamDebug = logical(appCfg.stream_debug); end
+        if isfield(appCfg,'save_basename'), S.saveBaseName = appCfg.save_basename; end
+        if isfield(appCfg,'last_usb_port'), S.lastUsbPort = appCfg.last_usb_port; end
+        if ~isfield(appCfg,'node'), return; end
+        nc = appCfg.node;
+        for chCfg = 1:min(MAX_NODES, numel(nc))
+            restoreNodeConfig(chCfg, nc(chCfg));
+        end
+        if isfield(appCfg,'plot_visible')
+            for chCfg = 1:min(MAX_NODES, numel(appCfg.plot_visible))
+                S.node(chCfg).visible = logical(appCfg.plot_visible(chCfg));
+            end
+        end
+    end
+
+    function restoreNodeConfig(chCfg, nodeCfg)
+        if isfield(nodeCfg,'slave_id'), S.node(chCfg).slave_id = nodeCfg.slave_id; end
+        if isfield(nodeCfg,'pga_code'), S.node(chCfg).pga_code = nodeCfg.pga_code; end
+        if isfield(nodeCfg,'vdac_byte'), S.node(chCfg).vdac_byte = nodeCfg.vdac_byte; end
+        if isfield(nodeCfg,'pgavdac'), S.node(chCfg).pgavdac = nodeCfg.pgavdac; end
+        if isfield(nodeCfg,'calibration'), S.node(chCfg).cal = nodeCfg.calibration; end
+        if isfield(nodeCfg,'cal'), S.node(chCfg).cal = nodeCfg.cal; end
+        if isfield(nodeCfg,'calibration_valid')
+            S.node(chCfg).calValid = logical(nodeCfg.calibration_valid);
+        elseif isfield(nodeCfg,'calValid')
+            S.node(chCfg).calValid = logical(nodeCfg.calValid);
+        else
+            S.node(chCfg).calValid = any(S.node(chCfg).cal ~= 0, 2);
+        end
+        if isfield(nodeCfg,'fir_cmd'), S.node(chCfg).filtCmd = nodeCfg.fir_cmd; end
+        if isfield(nodeCfg,'filtCmd'), S.node(chCfg).filtCmd = nodeCfg.filtCmd; end
+        if isfield(nodeCfg,'fir_coeffs')
+            S.node(chCfg).filtB = nodeCfg.fir_coeffs;
+        elseif isfield(nodeCfg,'filtB')
+            S.node(chCfg).filtB = nodeCfg.filtB;
+        elseif ~isempty(S.node(chCfg).filtCmd)
+            S.node(chCfg).filtB = compileFirCommand(S.node(chCfg).filtCmd);
+        end
+        if ~isempty(S.node(chCfg).filtB)
+            S.node(chCfg).filtZi = zeros(1,max(0,length(S.node(chCfg).filtB)-1));
+        end
+        if isfield(nodeCfg,'dc_remove'), S.node(chCfg).dcRemove = logical(nodeCfg.dc_remove); end
+        if isfield(nodeCfg,'dcRemove'), S.node(chCfg).dcRemove = logical(nodeCfg.dcRemove); end
+        if isfield(nodeCfg,'notch_enabled'), S.node(chCfg).notchEnabled = logical(nodeCfg.notch_enabled); end
+        if isfield(nodeCfg,'notchEnabled'), S.node(chCfg).notchEnabled = logical(nodeCfg.notchEnabled); end
+        if isfield(nodeCfg,'notch_mu'), S.node(chCfg).notchMu = nodeCfg.notch_mu; end
+        if isfield(nodeCfg,'notchMu'), S.node(chCfg).notchMu = nodeCfg.notchMu; end
+        if isfield(nodeCfg,'notch_harmonics'), S.node(chCfg).notchHarm = nodeCfg.notch_harmonics; end
+        if isfield(nodeCfg,'notchHarm'), S.node(chCfg).notchHarm = nodeCfg.notchHarm; end
+        if isfield(nodeCfg,'tx_mode'), S.node(chCfg).tx_mode = txModeCode(nodeCfg.tx_mode); end
+        if isfield(nodeCfg,'tx_mode_name'), S.node(chCfg).tx_mode = txModeCode(nodeCfg.tx_mode_name); end
+        if isfield(nodeCfg,'visible'), S.node(chCfg).visible = logical(nodeCfg.visible); end
+    end
+
+    function b = compileFirCommand(cmdStr)
+        b = [];
+        cmdStr = strtrim(cmdStr);
+        if isempty(cmdStr), return; end
+        try
+            b = eval(cmdStr);
+            if ~isvector(b) || ~isnumeric(b), b = []; return; end
+            b = b(:)' / sum(abs(b));
+        catch
+            b = [];
+        end
+    end
+
+    function txt = firStatusText(chCfg)
+        if isempty(S.node(chCfg).filtB)
+            txt = 'Sin filtro';
+        else
+            txt = sprintf('FIR %d coefs', length(S.node(chCfg).filtB));
+        end
+    end
+
+    function mode = txModeCode(modeName)
+        if isnumeric(modeName) || islogical(modeName)
+            mode = uint8(modeName);
+            % TX_DEBUG ya no existe en la UI; degradar a TX_RAW
+            if mode == TX_DEBUG, mode = TX_RAW; end
+            return;
+        end
+        if any(strcmpi(modeName, {'Filtered ADC','Filtrado','Filtered','Filtro'}))
+            mode = TX_FILTERED;
+        else
+            mode = TX_RAW;
+        end
+    end
+
+    function name = txModeName(mode)
+        mode = txModeCode(mode);
+        if mode == TX_FILTERED
+            name = 'Filtered ADC';
+        else
+            name = 'Raw ADC';
+        end
+    end
+
+    function name = pgaGainName(code)
+        gains = {'1x','2x','4x','5x','8x','10x','16x','32x','50x'};
+        idx = double(code) + 1;
+        if idx >= 1 && idx <= numel(gains)
+            name = gains{idx};
+        else
+            name = sprintf('code_%d', double(code));
+        end
+    end
+
+    function name = nodeDisplayName(chCfg)
+        if chCfg == 1
+            name = NODE_NAMES{chCfg};
+            return;
+        end
+        id = strtrim(S.node(chCfg).slave_id);
+        if isempty(id)
+            name = NODE_NAMES{chCfg};
+        else
+            name = sprintf('%s (%s)', NODE_NAMES{chCfg}, id);
+        end
+    end
+
+    function titleText = slaveTabTitle(chCfg)
+        id = strtrim(S.node(chCfg).slave_id);
+        if isempty(id)
+            titleText = sprintf('Esclavo %d', chCfg-1);
+        else
+            titleText = sprintf('Esclavo %d - %s', chCfg-1, id);
+        end
+    end
+
+    function setSlaveId(chCfg, id)
+        id = strtrim(id);
+        if isempty(id), id = sprintf('S%d', chCfg-1); end
+        S.node(chCfg).slave_id = id;
+        updateSlaveTitle(chCfg);
+        logM(sprintf('slave_id ch=%d id="%s"', chCfg-1, id));
+    end
+
+    function updateSlaveTitle(chCfg)
+        if chCfg >= 2 && chCfg <= 4 && isLiveHandle(tabs(chCfg))
+            tabs(chCfg).Title = slaveTabTitle(chCfg);
+        end
+    end
+
+    function txt = calStatusText(chCfg)
+        code = S.node(chCfg).pga_code;
+        if S.node(chCfg).calValid(code+1)
+            row = S.node(chCfg).cal(code+1,:);
+            txt = sprintf('%s → VDAC %d', pgaGainName(code), round(row(2)));
+        else
+            txt = sprintf('%s sin VDAC', pgaGainName(code));
         end
     end
 
@@ -930,26 +1695,70 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
     function onSave(~,~)
         base = strtrim(efSaveName.Value);
         if isempty(base), base = 'muestra'; end
+        S.saveBaseName = base;
         ex   = dir(fullfile(DATA_DIR,[base '_*.mat']));
         idx  = length(ex)+1;
         fn   = sprintf('%s_%03d.mat',base,idx);
         fp   = fullfile(DATA_DIR,fn);
+        appCfg = makeConfigSnapshot();
 
-        muestras.fecha   = datestr(now);
-        muestras.fs      = FS;
-        muestras.nSlaves = S.nSlaves;
+        muestras.version       = 3;
+        muestras.fecha         = datestr(now);
+        muestras.fs            = FS;
+        muestras.nSlaves       = S.nSlaves;
+        muestras.hammer_tip    = S.hammerTip;
+        muestras.tx_mode_items = TX_MODE_ITEMS;
+        muestras.hammer.node_id = 0;
+        muestras.hammer.tip     = S.hammerTip;
+        muestras.hammer.raw_samples  = S.node(1).notchBuf;
+        muestras.hammer.filt_samples = S.node(1).filtBuf;
+        muestras.config = appCfg;
         for ch = 1:MAX_NODES
-            muestras.node(ch).node_id       = ch-1;
-            muestras.node(ch).raw_samples   = S.node(ch).notchBuf;
-            muestras.node(ch).filt_samples  = S.node(ch).filtBuf;
-            muestras.node(ch).pga_code      = S.node(ch).pga_code;
-            muestras.node(ch).vdac_byte     = S.node(ch).vdac_byte;
-            muestras.node(ch).fir_cmd       = S.node(ch).filtCmd;
-            muestras.node(ch).drift_us_hist = S.node(ch).driftHist;
-            muestras.node(ch).drift_us_mean = safeStatF(S.node(ch).driftHist,'mean');
-            muestras.node(ch).drift_us_std  = safeStatF(S.node(ch).driftHist,'std');
-            muestras.node(ch).batch_count   = S.node(ch).batchCount;
-            muestras.node(ch).salud         = S.node(ch).salud;
+            driftMeanUs = safeStatF(S.node(ch).driftHist,'mean');
+            driftStdUs  = safeStatF(S.node(ch).driftHist,'std');
+            muestras.node(ch).node_id          = ch-1;
+            muestras.node(ch).name             = nodeDisplayName(ch);
+            muestras.node(ch).default_name     = NODE_NAMES{ch};
+            muestras.node(ch).slave_id         = S.node(ch).slave_id;
+            muestras.node(ch).is_active        = (ch == 1) || (ch <= 1 + S.nSlaves);
+            muestras.node(ch).raw_samples      = S.node(ch).notchBuf;
+            muestras.node(ch).filt_samples     = S.node(ch).filtBuf;
+            muestras.node(ch).pga_code         = S.node(ch).pga_code;
+            muestras.node(ch).pga_gain         = pgaGainName(S.node(ch).pga_code);
+            muestras.node(ch).vdac_byte        = S.node(ch).vdac_byte;
+            muestras.node(ch).vdac_volts       = S.node(ch).vdac_byte * VDAC_STEP;
+            muestras.node(ch).pgavdac          = S.node(ch).pgavdac;
+            muestras.node(ch).pgavdac_gain     = pgaGainName(S.node(ch).pgavdac);
+            muestras.node(ch).calibration      = S.node(ch).cal;
+            muestras.node(ch).calibration_valid = S.node(ch).calValid;
+            muestras.node(ch).tx_mode          = uint8(S.node(ch).tx_mode);
+            muestras.node(ch).tx_mode_name     = txModeName(S.node(ch).tx_mode);
+            muestras.node(ch).fir_cmd          = S.node(ch).filtCmd;
+            muestras.node(ch).fir_coeffs       = S.node(ch).filtB;
+            muestras.node(ch).fir_enabled      = ~isempty(S.node(ch).filtB);
+            muestras.node(ch).dc_remove        = S.node(ch).dcRemove;
+            muestras.node(ch).notch_enabled    = S.node(ch).notchEnabled;
+            muestras.node(ch).notch_mu         = S.node(ch).notchMu;
+            muestras.node(ch).notch_harmonics  = S.node(ch).notchHarm;
+            muestras.node(ch).drift_us_hist    = S.node(ch).driftHist;
+            muestras.node(ch).drift_us_mean    = driftMeanUs;
+            muestras.node(ch).drift_us_std     = driftStdUs;
+            muestras.node(ch).drift_s_hist     = S.node(ch).driftHist * 1e-6;
+            muestras.node(ch).drift_s_mean     = driftMeanUs * 1e-6;
+            muestras.node(ch).drift_s_std      = driftStdUs * 1e-6;
+            muestras.node(ch).first_sample_us  = S.node(ch).tFirst;
+            muestras.node(ch).got_first_sample = S.node(ch).gotFirst;
+            muestras.node(ch).batch_count      = S.node(ch).batchCount;
+            muestras.node(ch).salud            = S.node(ch).salud;
+            muestras.node(ch).visible          = S.node(ch).visible;
+            muestras.node(ch).config           = appCfg.node(ch);
+        end
+        if S.nSlaves > 0
+            for k = 1:S.nSlaves
+                muestras.slave(k) = muestras.node(k+1); %#ok<AGROW>
+            end
+        else
+            muestras.slave = struct([]);
         end
         try
             save(fp,'muestras');
@@ -963,18 +1772,10 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
     end
 
     function guardarConfig()
-        nodesCfg = struct();
-        for ch = 1:MAX_NODES
-            nodesCfg(ch).pga_code  = S.node(ch).pga_code;
-            nodesCfg(ch).vdac_byte = S.node(ch).vdac_byte;
-            nodesCfg(ch).pgavdac   = S.node(ch).pgavdac;
-            nodesCfg(ch).cal       = S.node(ch).cal;
-            nodesCfg(ch).filtCmd   = S.node(ch).filtCmd;
-            nodesCfg(ch).dcRemove  = S.node(ch).dcRemove;
-        end
-        logSlot = nextSlot;    %#ok
+        appCfg = makeConfigSnapshot();
+        nodesCfg = appCfg.node;
         try
-            save(CFG_FILE,'nodesCfg','logSlot');
+            save(CFG_FILE,'appCfg','nodesCfg');
         catch
         end
     end
@@ -989,14 +1790,28 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
 %% ════════════════════════════════════════════════════════════════════════
 
     function onClose(~,~)
+        try, setDriftDebugSlaves(false); catch, end
+        try, setStreamDebugSignal(false); catch, end
         try
             if ~isempty(tmr) && isvalid(tmr)
                 if strcmp(tmr.Running,'on'), stop(tmr); end
                 delete(tmr);
             end
         catch, end
+        try
+            if ~isempty(tmrRender) && isvalid(tmrRender)
+                if strcmp(tmrRender.Running,'on'), stop(tmrRender); end
+                delete(tmrRender);
+            end
+        catch, end
         if S.streaming, try, psocCmd(hex2dec('A1'),0); catch, end; end
         if ~isempty(S.port) && isvalid(S.port), delete(S.port); end
+        % Cerrar puertos debug esclavos
+        for ch = 1:MAX_NODES
+            if ~isempty(S.node(ch).dbgPort) && isvalid(S.node(ch).dbgPort)
+                delete(S.node(ch).dbgPort);
+            end
+        end
         guardarConfig();
         logH('Sesión cerrada');
         logM('onClose');
@@ -1034,6 +1849,102 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
 %%  Utilidades
 %% ════════════════════════════════════════════════════════════════════════
 
+%% ════════════════════════════════════════════════════════════════════════
+%%  Debug COM — conectar / desconectar / polling
+%% ════════════════════════════════════════════════════════════════════════
+
+    function connectDbg(isMaster, ch, dd, btnC, btnD)
+        portName = dd.Value;
+        if isempty(portName) || strcmp(portName,'(sin puertos)'), return; end
+        try
+            sp = serialport(portName, 115200, 'Timeout', 0.1);
+            flush(sp);
+        catch ME
+            logH(sprintf('Debug COM error: %s', ME.message)); return;
+        end
+        if ~isempty(S.node(ch).dbgPort) && isvalid(S.node(ch).dbgPort)
+            delete(S.node(ch).dbgPort);
+        end
+        S.node(ch).dbgPort = sp;
+        S.node(ch).dbgBuf  = '';
+        btnC.Enable = 'off';
+        btnD.Enable = 'on';
+        logH(sprintf('Debug COM esclavo %d conectado: %s', ch-1, portName));
+        if isempty(tmr) || ~isvalid(tmr)
+            tmr = timer('ExecutionMode','fixedRate','Period',0.05, ...
+                'TimerFcn',@timerRX,'BusyMode','drop');
+        end
+        if strcmp(tmr.Running,'off'), start(tmr); end
+        if isempty(tmrRender) || ~isvalid(tmrRender)
+            tmrRender = timer('ExecutionMode','fixedRate','Period',0.15, ...
+                'TimerFcn',@timerRenderFcn,'BusyMode','drop');
+        end
+        if strcmp(tmrRender.Running,'off'), start(tmrRender); end
+    end
+
+    function disconnectDbg(isMaster, ch, btnC, btnD)
+        if ~isempty(S.node(ch).dbgPort) && isvalid(S.node(ch).dbgPort)
+            delete(S.node(ch).dbgPort);
+        end
+        S.node(ch).dbgPort = [];
+        S.node(ch).dbgBuf  = '';
+        btnC.Enable = 'on';
+        btnD.Enable = 'off';
+        logH(sprintf('Debug COM esclavo %d desconectado', ch-1));
+    end
+
+    function pollAllDbg()
+        for dCh = 1:MAX_NODES
+            if ~isempty(S.node(dCh).dbgPort) && isvalid(S.node(dCh).dbgPort)
+                S.node(dCh).dbgBuf = drainDbgPort(S.node(dCh).dbgPort, ...
+                    S.node(dCh).dbgBuf, false, dCh, S.node(dCh).dbgTa);
+            end
+        end
+    end
+
+    function newBuf = drainDbgPort(sp, buf, isMaster, ch, ta)
+        newBuf = buf;
+        try
+            nb = sp.NumBytesAvailable;
+            if nb == 0, return; end
+            raw = read(sp, nb, 'uint8');
+        catch
+            return;
+        end
+        for k = 1:numel(raw)
+            c = char(raw(k));
+            if c == newline || c == char(13)
+                line = strtrim(newBuf);
+                if ~isempty(line)
+                    ts  = datestr(now,'HH:MM:SS.FFF');
+                    if isMaster
+                        prefix = 'M';
+                    else
+                        prefix = sprintf('S%d', ch-1);
+                    end
+                    msg = sprintf('[%s][%s] %s', ts, prefix, line);
+                    if isNoisyHumanLogLine(line)
+                        logM(sprintf('DBG %s %s', prefix, line));
+                    else
+                        logH(msg);
+                    end
+                    % Actualizar textarea
+                    if isLiveHandle(ta)
+                        cur = ta.Value;
+                        if ischar(cur), cur = {cur}; end
+                        cur{end+1} = msg;
+                        if numel(cur) > 80, cur = cur(end-79:end); end
+                        ta.Value = cur;
+                        scroll(ta,'bottom');
+                    end
+                end
+                newBuf = '';
+            else
+                newBuf = [newBuf, c]; %#ok<AGROW>
+            end
+        end
+    end
+
     function tf = isLiveHandle(h)
         if isempty(h)
             tf = false;
@@ -1044,6 +1955,13 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
         catch
             tf = false;
         end
+    end
+
+    function tf = isNoisyHumanLogLine(line)
+        line = lower(string(line));
+        tf = contains(line, 'hello tx') || ...
+             contains(line, 'hello recibido') || ...
+             (contains(line, 'bok=') && contains(line, 'txok='));
     end
 
     function [yOut, w] = lineCanceller(x, w, n, fs, f0, nH, mu)

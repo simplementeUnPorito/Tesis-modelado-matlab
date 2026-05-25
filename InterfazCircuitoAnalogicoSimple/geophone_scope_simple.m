@@ -179,7 +179,7 @@ function geophone_scope_simple()
     %   pFilt    y=649 h=124
     %   pEntidad y=337 h=310
     %   pGuardar y=223 h=112
-    %   pData    y=127 h=94
+    %   pData    y=127 h=118
     %   pZoom    y=35  h=90
     % =====================================================================
     fig = uifigure('Name','Geophone Scope','Position',[60 40 1100 1224]);
@@ -331,16 +331,18 @@ function geophone_scope_simple()
         'Position',[138 66 74 20],'FontSize',9);
 
     % --- Datos / Config ---
-    pData = uipanel(fig,'Title','Datos','Position',[RX 127 RW 94]);
-    lblInfo = uilabel(pData,'Text','n=0  t=0 ms','Position',[8 68 210 18]);
-    uilabel(pData,'Text','Vent(pts):','Position',[8 44 62 20]);
+    pData = uipanel(fig,'Title','Datos','Position',[RX 127 RW 118]);
+    lblInfo = uilabel(pData,'Text','n=0  t=0 ms','Position',[8 92 RW-16 18]);
+    uilabel(pData,'Text','Vista (pts):','Position',[8 68 66 20],'FontSize',9);
     edtTWin = uieditfield(pData,'numeric','Value',S.tWin,...
         'Limits',[0 1e8],'RoundFractionalValues','on',...
-        'Position',[72 42 44 22],'ValueChangedFcn',@(~,~)onTWinChanged());
-    uilabel(pData,'Text','Max pts:','Position',[122 44 54 20]);
+        'Position',[76 66 RW-84 22],'Tooltip','Puntos visibles en la ventana de plot (0=auto)', ...
+        'ValueChangedFcn',@(~,~)onTWinChanged());
+    uilabel(pData,'Text','Max buf:','Position',[8 44 50 20],'FontSize',9);
     edtMaxPts = uieditfield(pData,'numeric','Value',S.maxPoints,...
         'Limits',[100 1e6],'RoundFractionalValues','on',...
-        'Position',[178 42 36 22],'ValueChangedFcn',@(~,~)onMaxPtsChanged());
+        'Position',[60 44 RW-68 22],'Tooltip','Máximo de muestras a conservar en memoria', ...
+        'ValueChangedFcn',@(~,~)onMaxPtsChanged());
     % Fila PGA
     uilabel(pData,'Text','PGA:','Position',[8 18 34 20]);
     ddPGA = uidropdown(pData,'Items',{'1','2','4','8','16','24','32','48','50'},...
@@ -1935,9 +1937,7 @@ function geophone_scope_simple()
         bG = psocCmd(0xA9, newPgaCode);
         bV = psocCmd(0xAA, newByte);
         try
-            if double(newPgaCode) ~= S.vdac_pga_code
-                write(S.sp, bG, 'uint8'); pause(0.01);
-            end
+            write(S.sp, bG, 'uint8'); pause(0.01);
             write(S.sp, bV, 'uint8');
         catch ex
             logMsg('VdacStep: error UART — ' + string(ex.message)); return;
@@ -1946,7 +1946,11 @@ function geophone_scope_simple()
         S.vdac_ref      = double(newByte);
         S.vref_target_v = V_new;
         updateVdacCalcDisplay();
-        setPending('VDAC', newByte, bV);
+        if double(newPgaCode) ~= S.servo_vdac_pga_code
+            setPending('PGAVDAC', newPgaCode, [bG bV]);
+        else
+            setPending('VDAC', newByte, bV);
+        end
         saveCalForCurrentPGA();
         saveConfig();
         logMsg(sprintf('VdacStep %+d → pgavdac=%dx byte=0x%02X  %.4fV  (delta=%.4fV)',...
@@ -1973,7 +1977,12 @@ function geophone_scope_simple()
         S.vdac_ref      = double(v);
         S.vref_target_v = out_v;
         updateVdacCalcDisplay();
-        setPending('VDAC', v, bV);
+        % Si cambió PGAvdac, el pending trackea ambos bytes juntos hasta confirmación
+        if code ~= S.servo_vdac_pga_code
+            setPending('PGAVDAC', code, [bG bV]);
+        else
+            setPending('VDAC', v, bV);
+        end
         saveCalForCurrentPGA();
         saveConfig();
         logMsg(sprintf('SendVout → pgavdac=%dx byte=0x%02X  %.4fV%s',...
