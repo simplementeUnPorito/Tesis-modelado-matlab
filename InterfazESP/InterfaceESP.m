@@ -3,8 +3,11 @@ function InterfaceESP()
 % Layout: TabGroup izquierdo (columna única) + plots a la derecha
 % Tabs: Maestro | Esclavo 1..N | Stream & Stats | Log
 
+% Limpiar timers de instancias anteriores que quedaron corriendo
+try, tAll = timerfindall(); if ~isempty(tAll), stop(tAll); delete(tAll); end; catch, end
+
 %% ── Constantes ─────────────────────────────────────────────────────────
-MAX_NODES    = 3;           % 1 maestro + 2 esclavos
+MAX_NODES    = 4;           % 1 maestro + 2 esclavos
 BAUD         = 921600;
 PKT_HEADER   = hex2dec('56');
 CMD_HEADER   = hex2dec('AB');
@@ -40,6 +43,12 @@ S.renderDirty     = false(1, MAX_NODES);
 S.maxBuf          = FS * 10;
 S.saveBaseName    = 'muestra';
 S.lastUsbPort     = '';
+S.recordingActive = false;   % true durante grabación: suprime render
+S.dumpStarted     = false;   % true cuando maestro entra en DUMPING
+S.prevMasterState = -1;      % estado anterior del heartbeat del maestro
+S.nBatches        = 0;       % n_batches configurado via Enviar Config
+S.batchConfigSent = false;   % habilita Iniciar
+S.autoStopTimer   = [];      % handle del timer de auto-stop
 tmr         = [];
 tmrRender   = [];
 
@@ -88,7 +97,8 @@ end
 %% ── Handles UI en scope padre (compartidos entre nested functions) ───────
 % Conexión / Stream (buildStreamTab los asigna, callbacks los usan)
 ddPort = []; spnSlaves = []; btnConnect = []; btnDisconn = []; lblConn = [];
-btnArm = [];
+btnArm = []; spnRecBatches = [];
+spnRecN = []; lblBatchInfo = []; btnSendBatch = [];
 lblSyncSt = []; lblArmCnt = [];
 lblDatos  = [];
 btnStreamOn = [];
@@ -206,6 +216,7 @@ tabs(6) = uitab(tg,'Title','Log');
 buildMaestroTab(tabs(1));
 for slv = 1:3, buildSlaveTab(slv+1, tabs(slv+1)); end
 buildStreamTab(tabs(5));
+updateBatchInfoLabel();
 buildLogTab(tabs(6));
 applyTabVisibility();
 updateDriftBatchVisibility();
@@ -413,19 +424,27 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
 
         % Sincronización
         pS = uipanel(tab,'Title','Sincronización','Position',[4 682 W 102]);
-        btnArm  = uibutton(pS,'Text','ARM / Drift','Position',[4  62 W-8 26], ...
+        btnArm  = uibutton(pS,'Text','Descubrir','Position',[4  62 W-8 26], ...
             'ButtonPushedFcn',@onArm,'Enable','off');
         lblSyncSt = uilabel(pS,'Text','Estado: IDLE',      'Position',[4 36 W-8 20]);
         lblArmCnt = uilabel(pS,'Text','Esclavos listos: 0','Position',[4 12 W-8 20]);
 
         % Stream
-        pSt = uipanel(tab,'Title','Stream','Position',[4 588 W 90]);
-        btnStreamOn  = uibutton(pSt,'Text','▶ Iniciar','Position',[4  78 W-8 24], ...
+        pSt = uipanel(tab,'Title','Stream','Position',[4 562 W 116]);
+        btnStreamOn = uibutton(pSt,'Text','▶ Iniciar','Position',[4 92 W-8 24], ...
             'ButtonPushedFcn',@onStreamOn,'Enable','off');
-        uibutton(pSt,'Text','Limpiar buffers','Position',[4 54 W-8 20], ...
-            'ButtonPushedFcn',@onClear);
-        uicheckbox(pSt,'Text','Debug','Position',[4 10 W-8 20], ...
+        btnSendBatch = uibutton(pSt,'Text','Enviar Config','Position',[4 66 W-8 22], ...
+            'ButtonPushedFcn',@onSendBatch,'Enable','off');
+        uilabel(pSt,'Text','Batches:','Position',[4 46 66 18]);
+        uicheckbox(pSt,'Text','Debug','Position',[72 46 W-76 18], ...
             'Value',S.streamDebug,'ValueChangedFcn',@(cb,~)onStreamDebugToggle(cb.Value));
+        spnRecN = uispinner(pSt,'Position',[4 24 68 22], ...
+            'Value',80,'Limits',[1 255],'Step',1,'RoundFractionalValues',true, ...
+            'ValueChangedFcn',@(~,~)updateBatchInfoLabel());
+        lblBatchInfo = uilabel(pSt,'Text','80 bat → 2400 mts ≈ 2.4 s', ...
+            'Position',[74 24 W-78 22],'FontSize',8);
+        uibutton(pSt,'Text','Limpiar buffers','Position',[4 2 W-8 20], ...
+            'ButtonPushedFcn',@onClear);
 
         % Deriva
         pDr = uipanel(tab,'Title','Deriva (s, E)','Position',[4 464 W 100]);
@@ -645,7 +664,8 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
         btnConnect.Enable = 'off';
         btnDisconn.Enable = 'on';
         btnArm.Enable     = 'on';
-        btnStreamOn.Enable= 'on';
+        btnStreamOn.Enable= 'off';   % se habilita sólo tras Enviar Config
+        if isLiveHandle(btnSendBatch), btnSendBatch.Enable = 'on'; end
         btnTestMaestro.Enable = 'on';
         for ch = 2:1+S.nSlaves
             if isfield(S.node(ch),'btnTest') && ~isempty(S.node(ch).btnTest)
@@ -683,9 +703,10 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
         btnConnect.Enable = 'on';
         btnDisconn.Enable = 'off';
         btnArm.Enable     = 'off';
-        btnArm.Text       = 'ARM / Drift';
+        btnArm.Text       = 'Descubrir';
         btnStreamOn.Enable= 'off';
         btnStreamOn.Text  = '▶ Iniciar';
+        if isLiveHandle(btnSendBatch), btnSendBatch.Enable = 'off'; end
         btnTestMaestro.Enable= 'off';
         S.armPending = false; S.armTimer = [];
         for ch = 2:MAX_NODES
@@ -693,6 +714,15 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
                 S.node(ch).btnTest.Enable = 'off';
             end
         end
+        S.recordingActive = false;
+        S.dumpStarted     = false;
+        S.prevMasterState = -1;
+        S.nBatches        = 0;
+        S.batchConfigSent = false;
+        if ~isempty(S.autoStopTimer) && isvalid(S.autoStopTimer)
+            try, stop(S.autoStopTimer); delete(S.autoStopTimer); catch, end
+        end
+        S.autoStopTimer = [];
         logH('Desconectado');
         logM('onDisconnect');
     end
@@ -703,15 +733,18 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
 
     function onArm(~,~)
         % Toggle: second press cancels
-        if S.armPending || S.driftMeasuring
+        if S.armPending
             cancelArmDrift();
             return;
         end
         if S.nSlaves == 0, logH('Configura el nº de esclavos primero'); return; end
+        % Descubrir: sólo ARM en modo streaming (n=0) para que los esclavos
+        % queden disponibles para tests. No hay medición de drift aquí.
+        psocCmd(hex2dec('AE'), 0);
         psocCmd(hex2dec('A2'), S.nSlaves);
         S.armPending = true;
-        lblSyncSt.Text = 'Estado: ARMING...';
-        btnArm.Text = 'Cancelar ARM';
+        lblSyncSt.Text = 'Estado: DISCOVERING...';
+        btnArm.Text = 'Cancelar';
         logH(sprintf('ARM → buscando %d esclavos', S.nSlaves));
         logM(sprintf('CMD ARM n=%d', S.nSlaves));
         tmrA = timer('StartDelay', 1.0, 'ExecutionMode', 'singleShot', 'TimerFcn', @armDone);
@@ -721,8 +754,7 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
             try, delete(tmrA); catch, end
             S.armTimer = [];
             S.armPending = false;
-            if isLiveHandle(btnArm), btnArm.Text = 'ARM / Drift'; end
-            doDriftMeasure();
+            if isLiveHandle(btnArm), btnArm.Text = 'Descubrir'; end
         end
     end
 
@@ -733,25 +765,27 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
         S.armTimer = [];
         S.armPending = false;
         S.driftMeasuring = false;
-        setDriftDebugSlaves(false);
-        try, psocCmd(hex2dec('A4'), 0); catch, end
-        try, psocCmd(hex2dec('A1'), 0); catch, end
-        S.streaming = false;
-        if isLiveHandle(btnArm),      btnArm.Text     = 'ARM / Drift'; end
+        if isLiveHandle(btnArm),      btnArm.Text     = 'Descubrir'; end
         if isLiveHandle(btnStreamOn), btnStreamOn.Text = '▶ Iniciar'; end
         lblSyncSt.Text = 'Estado: IDLE';
-        logH('ARM/Drift cancelado'); logM('ARM cancel');
+        logH('Descubrir cancelado'); logM('ARM cancel');
     end
 
     function onStop(~,~)
+        if ~isempty(S.autoStopTimer) && isvalid(S.autoStopTimer)
+            try, stop(S.autoStopTimer); delete(S.autoStopTimer); catch, end
+            S.autoStopTimer = [];
+        end
         S.driftT0 = [];
         setDriftDebugSlaves(false);
         setStreamDebugSignal(false);
         try, psocCmd(hex2dec('A4'), 0); catch, end
         try, psocCmd(hex2dec('A1'), 0); catch, end
         S.streaming = false;
+        S.recordingActive = false;
+        S.renderDirty(:) = true;
         if isLiveHandle(btnStreamOn), btnStreamOn.Text = '▶ Iniciar'; end
-        lblSyncSt.Text = 'Estado: IDLE';
+        lblSyncSt.Text = 'Estado: STOPPING...';
         logH('STOP'); logM('CMD STOP');
     end
 
@@ -838,49 +872,107 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
             formatDriftScalar(S.node(1).tFirst), strjoin(parts, ' ')));
     end
 
+    function onSendBatch(~,~)
+        if S.nSlaves == 0, logH('Configura el nº de esclavos primero'); return; end
+        n = max(1, min(255, round(spnRecN.Value)));
+        psocCmd(hex2dec('AE'), n);          % configurar n_batches en esclavos
+        psocCmd(hex2dec('A2'), S.nSlaves);  % ARM: esclavos quedan esperando A3
+        S.nBatches = n;
+        S.batchConfigSent = true;
+        if isLiveHandle(btnStreamOn), btnStreamOn.Enable = 'on'; end
+        dur = n * 30 / FS;
+        if isLiveHandle(lblBatchInfo)
+            lblBatchInfo.Text = sprintf('%d bat → %d mts ≈ %.1f s', n, n*30, dur);
+        end
+        lblSyncSt.Text = 'Estado: ARMING...';
+        logH(sprintf('Config: %d batches (%.1f s/esclavo)', n, dur));
+        logM(sprintf('TX std cmd=0xAE p=%d', n));
+        logM(sprintf('streamOn ARM'));
+    end
+
+    function updateBatchInfoLabel()
+        if ~isLiveHandle(spnRecN) || ~isLiveHandle(lblBatchInfo), return; end
+        n = max(1, min(255, round(spnRecN.Value)));
+        dur = n * 30 / FS;
+        lblBatchInfo.Text = sprintf('%d bat → %d mts ≈ %.1f s', n, n*30, dur);
+    end
+
     function onStreamOn(~,~)
         if S.streaming
             onStreamOff();
             return;
         end
-        if S.nSlaves == 0
-            logH('Configura el nº de esclavos primero'); return;
+        if ~S.batchConfigSent
+            logH('Primero usa "Enviar Config"'); return;
         end
-        % ARM → esperar 1.5 s → START + stream real
-        psocCmd(hex2dec('A2'), S.nSlaves);
-        lblSyncSt.Text = 'Estado: ARMING...';
+        % Limpiar todos los buffers para que cada grabación empiece desde cero
+        for chCl = 1:MAX_NODES
+            S.node(chCl).notchBuf  = [];
+            S.node(chCl).filtBuf   = [];
+            S.node(chCl).batchCount = 0;
+            if isLiveHandle(S.node(chCl).hRaw)
+                set(S.node(chCl).hRaw,  'XData', NaN, 'YData', NaN);
+                set(S.node(chCl).hFilt, 'XData', NaN, 'YData', NaN);
+            end
+        end
+        % Esclavos ya están armados desde Enviar Config — sólo enviar START
+        if S.streamDebug
+            setStreamDebugSignal(true);   % A7(1) → master RUNNING+ramp, esclavos debug
+        else
+            psocCmd(hex2dec('A1'), 1);    % A1(1) → master stream live ADC real
+        end
+        psocCmd(hex2dec('A3'), 0);
+        S.streaming = true;
+        S.recordingActive = true;
         btnStreamOn.Text = '■ Detener';
-        logH('Stream: ARM enviado'); logM('streamOn ARM');
-        tmrSO = timer('StartDelay',1.5,'ExecutionMode','singleShot','TimerFcn',@doStreamStart);
-        start(tmrSO);
-        function doStreamStart(~,~)
-            try, delete(tmrSO); catch, end
-            % Marcar t0 para drift de primera muestra
-            S.driftT0 = tic;
-            for chSO = 1:MAX_NODES
-                S.node(chSO).gotFirst = false;
-                S.node(chSO).tFirst   = 0;
+        durRec = S.nBatches * 30 / FS;
+        lblSyncSt.Text = sprintf('Estado: GRABANDO (%.1f s)', durRec);
+        logH(sprintf('Iniciar: grabando %.1f s', durRec));
+        logM(sprintf('CMD START store n=%d', S.nBatches));
+        % Auto-stop: redondear a ms para evitar warning de precisión sub-ms
+        delayAS = round((durRec + 1.5) * 1000) / 1000;
+        if delayAS < 0.001, delayAS = 0.001; end
+        tmrAS = timer('StartDelay', delayAS, 'ExecutionMode', 'singleShot', ...
+                      'TimerFcn', @doAutoStop);
+        S.autoStopTimer = tmrAS;
+        start(tmrAS);
+        function doAutoStop(~,~)
+            try, delete(S.autoStopTimer); catch, end
+            S.autoStopTimer = [];
+            setStreamDebugSignal(false);
+            try, psocCmd(hex2dec('A1'), 0); catch, end
+            try, psocCmd(hex2dec('A4'), 0); catch, end
+            S.streaming = false;
+            % Marcar dump iniciado aquí para que el trim dispare en IDLE incluso
+            % si la fase DUMPING es tan corta que no llega ningún heartbeat con state=5
+            S.dumpStarted = true;
+            if isLiveHandle(btnStreamOn)
+                btnStreamOn.Text   = '▶ Iniciar';
+                btnStreamOn.Enable = 'on';
             end
-            % Debug ANTES de START para que esclavos ya estén en modo fake al recibir flanco
-            if S.streamDebug
-                setStreamDebugSignal(true);
-            end
-            psocCmd(hex2dec('A1'), 1);
-            psocCmd(hex2dec('A3'), 0);
-            S.streaming = true;
-            lblSyncSt.Text = 'Estado: RUNNING';
-            logH('Stream RUNNING'); logM(sprintf('STREAM ON debug=%d', uint8(S.streamDebug)));
+            lblSyncSt.Text = 'Estado: STOPPING...';
+            logH('Auto-stop: esperando datos de esclavos...');
+            logM('doAutoStop A4');
         end
     end
 
     function onStreamOff(~,~)
+        if ~isempty(S.autoStopTimer) && isvalid(S.autoStopTimer)
+            try, stop(S.autoStopTimer); delete(S.autoStopTimer); catch, end
+            S.autoStopTimer = [];
+        end
         setStreamDebugSignal(false);
         try, psocCmd(hex2dec('A4'), 0); catch, end
         try, psocCmd(hex2dec('A1'), 0); catch, end
         S.streaming = false;
         S.driftT0   = [];
+        if S.recordingActive
+            S.dumpStarted = true;   % trigger trim en IDLE
+        end
+        S.recordingActive = false;
+        S.renderDirty(:) = true;
         if isLiveHandle(btnStreamOn), btnStreamOn.Text = '▶ Iniciar'; end
-        lblSyncSt.Text = 'Estado: IDLE';
+        lblSyncSt.Text = 'Estado: STOPPING...';
         logH('Stream detenido'); logM('STREAM OFF');
     end
 
@@ -1003,14 +1095,13 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
             S.node(ch).filtBuf   = [];
             S.node(ch).filtZi    = [];
             S.node(ch).lineW     = [];
-            S.node(ch).driftHist = [];
             S.node(ch).batchCount= 0;
+            % driftHist se conserva — es calibración, no datos de muestra
             if isLiveHandle(S.node(ch).ax)
                 set(S.node(ch).hRaw, 'XData',NaN,'YData',NaN);
                 set(S.node(ch).hFilt,'XData',NaN,'YData',NaN);
             end
         end
-        for k = 1:3, driftLabels(k).Text = sprintf('Esclavo %d: --',k); end
         logH('Buffers limpiados'); logM('CLEAR');
     end
 
@@ -1065,11 +1156,35 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
 
     function onTestEsclavo(ch)
         if ch < 2 || ch > MAX_NODES, return; end
+        if S.recordingActive, logH('Grabación activa — espera a que termine'); return; end
         wasStreaming = S.streaming;
+        % Asegurar que el maestro no esté en modo debug antes del test
+        psocCmd(hex2dec('A7'), 0);
+        % Poner esclavos en modo streaming (AE=0) para que los batches de debug
+        % se transmitan en lugar de almacenarse en RAM. Tras el test el usuario
+        % debe volver a pulsar "Enviar Config" para reconfigurar la grabación.
+        psocCmd(hex2dec('AE'), 0);
+        S.batchConfigSent = false;
+        if isLiveHandle(btnStreamOn), btnStreamOn.Enable = 'off'; end
+        % Limpiar todos los buffers para que el test empiece sin datos rancios
+        for chCl = 1:MAX_NODES
+            S.node(chCl).notchBuf  = [];
+            S.node(chCl).filtBuf   = [];
+            S.node(chCl).batchCount = 0;
+            if isLiveHandle(S.node(chCl).hRaw)
+                set(S.node(chCl).hRaw,  'XData', NaN, 'YData', NaN);
+                set(S.node(chCl).hFilt, 'XData', NaN, 'YData', NaN);
+            end
+        end
         if ~wasStreaming
             psocCmd(hex2dec('A1'), 1);
             S.streaming = true;
         end
+        % Setup drift: registrar tiempo de llegada del primer batch de este esclavo
+        S.driftT0 = tic;
+        S.node(ch).gotFirst  = false;
+        S.node(ch).tFirst    = 0;
+        S.node(ch).driftHist = [];    % reset para medición fresca
         enviarDirigido(ch, hex2dec('A7'), 1);
         init0 = S.node(ch).batchCount;
         S.node(ch).lblSalud.FontColor   = [0.8 0.6 0.0];
@@ -1083,6 +1198,16 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
                 try, psocCmd(hex2dec('A1'), 0); catch, end
                 S.streaming = false;
             end
+            % Calcular deriva directamente desde tFirst (sin esperar a otros nodos)
+            if S.node(ch).gotFirst
+                dVal = S.node(ch).tFirst;
+                S.node(ch).driftHist(end+1) = dVal;
+                if length(S.node(ch).driftHist) > 50
+                    S.node(ch).driftHist = S.node(ch).driftHist(end-49:end);
+                end
+                logM(sprintf('drift Esclavo %d tFirst=%.0f us', ch-1, dVal));
+            end
+            S.driftT0 = [];   % limpiar para no afectar próximas mediciones
             g  = S.node(ch).batchCount - init0;
             ok = g >= 3;
             S.node(ch).salud = 1 + ~ok;
@@ -1090,6 +1215,10 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
                 S.node(ch).lblSalud.FontColor   = [0.0 0.7 0.0];
                 S.node(ch).lblSaludTxt.Text     = 'OK';
                 logH(sprintf('Test Esclavo %d: OK',ch-1));
+                if ~isempty(S.node(ch).driftHist) && isLiveHandle(driftLabels(ch-1))
+                    driftLabels(ch-1).Text = sprintf('Esclavo %d: %s', ...
+                        ch-1, formatDriftStats(S.node(ch).driftHist));
+                end
             else
                 S.node(ch).lblSalud.FontColor   = [0.8 0.1 0.1];
                 S.node(ch).lblSaludTxt.Text     = sprintf('FAIL (%d)',g);
@@ -1292,19 +1421,21 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
     function timerRenderFcn(~,~)
         dirty = S.renderDirty;
         S.renderDirty(:) = false;
-        for chUpd = find(dirty)
-            updatePlot(chUpd);
-        end
-        if any(dirty)
-            drawnow limitrate;
-            if isLiveHandle(lblDatos)
-                totalSamp = 0;
-                for ccc = 1:MAX_NODES
-                    totalSamp = totalSamp + length(S.node(ccc).notchBuf);
-                end
-                totalBatch = sum([S.node.batchCount]);
-                lblDatos.Text = sprintf('Buf: %d mts  |  Batches: %d', totalSamp, totalBatch);
+        if ~S.recordingActive
+            for chUpd = find(dirty)
+                updatePlot(chUpd);
             end
+            if any(dirty)
+                drawnow limitrate;
+            end
+        end
+        if any(dirty) && isLiveHandle(lblDatos)
+            totalSamp = 0;
+            for ccc = 1:MAX_NODES
+                totalSamp = totalSamp + length(S.node(ccc).notchBuf);
+            end
+            totalBatch = sum([S.node.batchCount]);
+            lblDatos.Text = sprintf('Buf: %d mts  |  Batches: %d', totalSamp, totalBatch);
         end
     end
 
@@ -1346,6 +1477,7 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
             case 1    % heartbeat [pga, vdac, state]
                 updateHBUI(ch, b2, b1);
                 logM(sprintf('HB ch=%d pga=%d vdac=%d state=%d',node_id,b2,b1,b0));
+                if ch == 1, handleMasterStateChange(b0); end
 
             case 7    % ACK [cmd, val, 0]
                 logH(sprintf('ACK nodo=%d cmd=0x%02X val=%d',node_id,b2,b1));
@@ -1672,6 +1804,54 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
         end
     end
 
+    function handleMasterStateChange(masterState)
+        % Llamado desde heartbeat del maestro (ch=1). Detecta DUMPING e IDLE post-dump.
+        if masterState == S.prevMasterState, return; end
+        S.prevMasterState = masterState;
+        switch masterState
+            case 5   % DUMPING — el maestro está descargando batches de esclavos
+                if ~S.dumpStarted
+                    S.dumpStarted = true;
+                    nExp = S.nBatches * 30;
+                    logH(sprintf('DUMP iniciado (~%d muestras por esclavo)', nExp));
+                    logM(sprintf('DUMP started nExp=%d', nExp * S.nSlaves));
+                end
+                if isLiveHandle(lblSyncSt)
+                    totalRecv = 0;
+                    for kD = 2:1+S.nSlaves
+                        totalRecv = totalRecv + S.node(kD).batchCount;
+                    end
+                    lblSyncSt.Text = sprintf('Estado: DUMP (%d mts)', totalRecv);
+                end
+            case 0   % IDLE — puede ser post-dump o inicio normal
+                if S.dumpStarted
+                    S.dumpStarted = false;
+                    S.recordingActive = false;   % liberar render tras dump
+                    S.renderDirty(:) = true;
+                    % Recortar canal maestro al mismo número de muestras que los esclavos
+                    nExp = S.nBatches * 30;
+                    if nExp > 0
+                        if length(S.node(1).notchBuf) > nExp
+                            S.node(1).notchBuf = S.node(1).notchBuf(1:nExp);
+                        end
+                        if length(S.node(1).filtBuf) > nExp
+                            S.node(1).filtBuf = S.node(1).filtBuf(1:nExp);
+                        end
+                        S.node(1).batchCount = length(S.node(1).notchBuf);
+                    end
+                    totalRecv = 0;
+                    for kD = 2:1+S.nSlaves
+                        totalRecv = totalRecv + S.node(kD).batchCount;
+                    end
+                    logH(sprintf('DUMP completo — %d muestras esclavos recibidas', totalRecv));
+                    logM(sprintf('DUMP complete recv=%d', totalRecv));
+                    if isLiveHandle(lblSyncSt)
+                        lblSyncSt.Text = 'Estado: IDLE';
+                    end
+                end
+        end
+    end
+
     function updateHBUI(ch, pga, vdac)
         gains = {'1x','2x','4x','5x','8x','10x','16x','32x','50x'};
         code  = double(pga)+1;
@@ -1792,6 +1972,16 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
     function onClose(~,~)
         try, setDriftDebugSlaves(false); catch, end
         try, setStreamDebugSignal(false); catch, end
+        try
+            if ~isempty(S.autoStopTimer) && isvalid(S.autoStopTimer)
+                stop(S.autoStopTimer); delete(S.autoStopTimer);
+            end
+        catch, end
+        try
+            if ~isempty(S.armTimer) && isvalid(S.armTimer)
+                stop(S.armTimer); delete(S.armTimer);
+            end
+        catch, end
         try
             if ~isempty(tmr) && isvalid(tmr)
                 if strcmp(tmr.Running,'on'), stop(tmr); end
