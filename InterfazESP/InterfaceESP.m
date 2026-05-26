@@ -258,7 +258,7 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
 
         % Stats maestro
         pS = uipanel(tab,'Title','Estadísticas','Position',[4 656 W 76]);
-        S.node(1).lblStats   = uilabel(pS,'Text','Batches: 0','Position',[4 36 W-12 20]);
+        S.node(1).lblStats   = uilabel(pS,'Text','Mts: 0  Bat: 0','Position',[4 36 W-12 20]);
         S.node(1).lblLastVal = uilabel(pS,'Text','Último: --', 'Position',[4 10 W-12 20]);
 
         % Punta de la maza
@@ -365,7 +365,7 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
 
         % Stats
         pSt = uipanel(tab,'Title','Estadísticas','Position',[4 402 W 82]);
-        S.node(ch).lblStats   = uilabel(pSt,'Text','Batches: 0  Drift: --', ...
+        S.node(ch).lblStats   = uilabel(pSt,'Text','Mts: 0  Bat: 0  Drift: --', ...
             'Position',[4 40 W-12 20]);
         S.node(ch).lblLastVal = uilabel(pSt,'Text','Último: --', ...
             'Position',[4 14 W-12 20]);
@@ -453,11 +453,11 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
                 'Position',[4 (3-k)*28+8 W-8 22]);
         end
 
-        % Batches globales
-        pBt = uipanel(tab,'Title','Batches recibidos','Position',[4 356 W 104]);
+        % Muestras/batches globales
+        pBt = uipanel(tab,'Title','Datos recibidos','Position',[4 356 W 104]);
         for ch = 1:MAX_NODES
             globalBatch(ch) = uilabel(pBt,'Text', ...
-                sprintf('%s: 0', NODE_NAMES{ch}), ...
+                sprintf('%s: 0 bat (0 mts)', NODE_NAMES{ch}), ...
                 'Position',[4 (MAX_NODES-ch)*22+8 W-8 20]);
         end
 
@@ -481,7 +481,7 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
 
         % Datos
         pDa = uipanel(tab,'Title','Datos','Position',[4 4 W 148]);
-        lblDatos = uilabel(pDa,'Text','Buf: 0 mts  |  Batches: 0', ...
+        lblDatos = uilabel(pDa,'Text','Buf: 0 mts  |  RX: 0 mts', ...
             'Position',[4 108 W-8 20]);
         uilabel(pDa,'Text','Vista(s):','Position',[4 84 56 20]);
         uispinner(pDa,'Position',[62 82 W-66 22], ...
@@ -914,10 +914,11 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
                 set(S.node(chCl).hRaw,  'XData', NaN, 'YData', NaN);
                 set(S.node(chCl).hFilt, 'XData', NaN, 'YData', NaN);
             end
+            updateStats(chCl);
         end
         % Esclavos ya están armados desde Enviar Config — sólo enviar START
         if S.streamDebug
-            setStreamDebugSignal(true);   % A7(1) → master RUNNING+ramp, esclavos debug
+            setStreamDebugSignal(true);   % prepara rampas debug; A3 dispara START
         else
             psocCmd(hex2dec('A1'), 1);    % A1(1) → master stream live ADC real
         end
@@ -1015,14 +1016,21 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
         if ~enable && ~S.streamDebugActive
             return;
         end
-        try, psocCmd(hex2dec('A7'), uint8(enable)); catch, end
         if enable
             lastDebugCh = 1 + S.nSlaves;
         else
             lastDebugCh = MAX_NODES;
         end
-        for chDbg = 2:lastDebugCh
-            try, enviarDirigido(chDbg, hex2dec('A7'), uint8(enable)); catch, end
+        if enable
+            for chDbg = 2:lastDebugCh
+                try, enviarDirigido(chDbg, hex2dec('A7'), uint8(enable)); catch, end
+            end
+            try, psocCmd(hex2dec('A7'), uint8(enable)); catch, end
+        else
+            try, psocCmd(hex2dec('A7'), uint8(enable)); catch, end
+            for chDbg = 2:lastDebugCh
+                try, enviarDirigido(chDbg, hex2dec('A7'), uint8(enable)); catch, end
+            end
         end
         S.streamDebugActive = logical(enable);
         logM(sprintf('streamDebugSignal=%d', uint8(enable)));
@@ -1101,6 +1109,7 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
                 set(S.node(ch).hRaw, 'XData',NaN,'YData',NaN);
                 set(S.node(ch).hFilt,'XData',NaN,'YData',NaN);
             end
+            updateStats(ch);
         end
         logH('Buffers limpiados'); logM('CLEAR');
     end
@@ -1175,6 +1184,7 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
                 set(S.node(chCl).hRaw,  'XData', NaN, 'YData', NaN);
                 set(S.node(chCl).hFilt, 'XData', NaN, 'YData', NaN);
             end
+            updateStats(chCl);
         end
         if ~wasStreaming
             psocCmd(hex2dec('A1'), 1);
@@ -1434,8 +1444,8 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
             for ccc = 1:MAX_NODES
                 totalSamp = totalSamp + length(S.node(ccc).notchBuf);
             end
-            totalBatch = sum([S.node.batchCount]);
-            lblDatos.Text = sprintf('Buf: %d mts  |  Batches: %d', totalSamp, totalBatch);
+            totalRx = sum([S.node.batchCount]);
+            lblDatos.Text = sprintf('Buf: %d mts  |  RX: %d mts', totalSamp, totalRx);
         end
     end
 
@@ -1555,16 +1565,24 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
         if ~isempty(S.node(ch).driftHist)
             dStr = formatDriftStats(S.node(ch).driftHist);
         end
+        nSamples = S.node(ch).batchCount;
+        nBatches = floor(nSamples / 30);
         if isLiveHandle(S.node(ch).lblStats)
-            S.node(ch).lblStats.Text = sprintf('Batches: %d  Drift: %s', ...
-                S.node(ch).batchCount, dStr);
+            if ch == 1
+                S.node(ch).lblStats.Text = sprintf('Mts: %d  Bat: %d', ...
+                    nSamples, nBatches);
+            else
+                S.node(ch).lblStats.Text = sprintf('Mts: %d  Bat: %d  Drift: %s', ...
+                    nSamples, nBatches, dStr);
+            end
         end
         if ~isempty(S.node(ch).notchBuf) && isLiveHandle(S.node(ch).lblLastVal)
             S.node(ch).lblLastVal.Text = sprintf('Último: %d LSB', ...
                 round(S.node(ch).notchBuf(end)));
         end
         if isLiveHandle(globalBatch(ch))
-            globalBatch(ch).Text = sprintf('%s: %d', NODE_NAMES{ch}, S.node(ch).batchCount);
+            globalBatch(ch).Text = sprintf('%s: %d bat (%d mts)', ...
+                NODE_NAMES{ch}, nBatches, nSamples);
         end
         if ch >= 2 && isLiveHandle(driftLabels(ch-1)) && ~isempty(S.node(ch).driftHist)
             driftLabels(ch-1).Text = sprintf('Esclavo %d: %s', ...
@@ -1842,6 +1860,9 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
                     totalRecv = 0;
                     for kD = 2:1+S.nSlaves
                         totalRecv = totalRecv + S.node(kD).batchCount;
+                    end
+                    for kD = 1:1+S.nSlaves
+                        updateStats(kD);
                     end
                     logH(sprintf('DUMP completo — %d muestras esclavos recibidas', totalRecv));
                     logM(sprintf('DUMP complete recv=%d', totalRecv));
