@@ -25,6 +25,9 @@ LOG_DIR      = fullfile(APP_DIR, 'logs');
 DATA_DIR     = fullfile(APP_DIR, 'datos');
 CFG_FILE     = fullfile(APP_DIR, 'scope_config.mat');
 N_LOG_SESSIONS = 10;
+START_LATENCY_PROBES = 12;
+START_LATENCY_PROBE_GAP_S = 0.04;
+CMD_START_PROBE = hex2dec('AF');
 
 %% ── Estado ──────────────────────────────────────────────────────────────
 S.port            = [];
@@ -67,6 +70,7 @@ for ch = 1:MAX_NODES
     S.node(ch).dcRemove  = false;
     S.node(ch).visible   = true;
     S.node(ch).driftHist = [];
+    S.node(ch).startLatencyHist = [];
     S.node(ch).batchCount    = 0;
     S.node(ch).salud         = 0;
     S.node(ch).tx_mode       = TX_RAW;
@@ -104,6 +108,7 @@ lblDatos  = [];
 btnStreamOn = [];
 % notch controls: now per-node in S.node(ch).notchEnabled/Mu/Harm
 driftLabels  = gobjects(3,1);
+latencyLabels = gobjects(3,1);
 globalBatch  = gobjects(MAX_NODES,1);
 efSaveName = []; lblSaveSt = [];
 taLog      = [];
@@ -446,11 +451,14 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
         uibutton(pSt,'Text','Limpiar buffers','Position',[4 2 W-8 20], ...
             'ButtonPushedFcn',@onClear);
 
-        % Deriva
-        pDr = uipanel(tab,'Title','Deriva (s, E)','Position',[4 464 W 100]);
+        % Reaccion ESP-NOW estimada por START_ACK (RTT/2)
+        pDr = uipanel(tab,'Title','Reaccion ESP-NOW','Position',[4 476 W 84]);
         for k = 1:3
-            driftLabels(k) = uilabel(pDr,'Text',sprintf('Esclavo %d: --',k), ...
-                'Position',[4 (3-k)*28+8 W-8 22]);
+            rowY = (3-k)*20 + 8;
+            driftLabels(k) = uilabel(pDr,'Text','', ...
+                'Position',[0 0 1 1], 'Visible','off');
+            latencyLabels(k) = uilabel(pDr,'Text',sprintf('S%d: --',k), ...
+                'Position',[6 rowY W-12 16], 'FontSize',9);
         end
 
         % Muestras/batches globales
@@ -556,7 +564,10 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
     function updateDriftBatchVisibility()
         for k = 1:3
             if isLiveHandle(driftLabels(k))
-                driftLabels(k).Visible = ternary(k <= S.nSlaves, 'on', 'off');
+                driftLabels(k).Visible = 'off';
+            end
+            if isLiveHandle(latencyLabels(k))
+                latencyLabels(k).Visible = ternary(k <= S.nSlaves, 'on', 'off');
             end
         end
         for ch = 1:MAX_NODES
@@ -803,8 +814,8 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
             S.node(chD).gotFirst = false;
             S.node(chD).tFirst   = 0;
         end
-        psocCmd(hex2dec('A3'), 0);
         setDriftDebugSlaves(true);
+        psocCmd(hex2dec('A3'), 0);
         lblSyncSt.Text = 'Estado: Midiendo drift...';
         logM('driftMeasure START');
         tmrDM = timer('StartDelay', 1.5, 'ExecutionMode', 'singleShot', 'TimerFcn', @finishDrift);
@@ -858,6 +869,7 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
         for k = 1:S.nSlaves
             ch = k + 1;
             if ~isnan(times(k))
+                % Diferencia de llegada de primera muestra; no es RTT, no se divide por 2.
                 d = times(k) - refTime;
                 S.node(ch).driftHist(end+1) = d;
                 if length(S.node(ch).driftHist) > 50
@@ -1163,6 +1175,24 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
         end
     end
 
+    function runStartLatencyProbe(ch)
+        if isempty(S.port) || ~isvalid(S.port), return; end
+        clearStartLatency(ch);
+        for kProbe = 1:START_LATENCY_PROBES
+            enviarDirigido(ch, CMD_START_PROBE, mod(kProbe, 256));
+            pause(START_LATENCY_PROBE_GAP_S);
+            try, timerRX([],[]); catch, end
+        end
+        pause(START_LATENCY_PROBE_GAP_S);
+        try, timerRX([],[]); catch, end
+        if isempty(S.node(ch).startLatencyHist)
+            logH(sprintf('Reacción ESP-NOW Esclavo %d: sin ACK', ch-1));
+        else
+            logH(sprintf('Reacción ESP-NOW Esclavo %d: %s', ...
+                ch-1, formatLatencyStats(S.node(ch).startLatencyHist)));
+        end
+    end
+
     function onTestEsclavo(ch)
         if ch < 2 || ch > MAX_NODES, return; end
         if S.recordingActive, logH('Grabación activa — espera a que termine'); return; end
@@ -1186,6 +1216,7 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
             end
             updateStats(chCl);
         end
+        runStartLatencyProbe(ch);
         if ~wasStreaming
             psocCmd(hex2dec('A1'), 1);
             S.streaming = true;
@@ -1194,7 +1225,6 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
         S.driftT0 = tic;
         S.node(ch).gotFirst  = false;
         S.node(ch).tFirst    = 0;
-        S.node(ch).driftHist = [];    % reset para medición fresca
         enviarDirigido(ch, hex2dec('A7'), 1);
         init0 = S.node(ch).batchCount;
         S.node(ch).lblSalud.FontColor   = [0.8 0.6 0.0];
@@ -1226,7 +1256,7 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
                 S.node(ch).lblSaludTxt.Text     = 'OK';
                 logH(sprintf('Test Esclavo %d: OK',ch-1));
                 if ~isempty(S.node(ch).driftHist) && isLiveHandle(driftLabels(ch-1))
-                    driftLabels(ch-1).Text = sprintf('Esclavo %d: %s', ...
+                    driftLabels(ch-1).Text = sprintf('S%d deriva: %s', ...
                         ch-1, formatDriftStats(S.node(ch).driftHist));
                 end
             else
@@ -1455,6 +1485,21 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
         typ     = double(pkt(3));
         b2=double(pkt(4)); b1=double(pkt(5)); b0=double(pkt(6));
 
+        % 0xFC — estimación reacción ESP-NOW START: RTT/2 en microsegundos
+        if typ == 252
+            if node_id == 255, return; end
+            chLat = node_id + 1;
+            if chLat < 2 || chLat > MAX_NODES, return; end
+            tofUs = b2*65536 + b1*256 + b0;
+            S.node(chLat).startLatencyHist(end+1) = tofUs;
+            if length(S.node(chLat).startLatencyHist) > 50
+                S.node(chLat).startLatencyHist = S.node(chLat).startLatencyHist(end-49:end);
+            end
+            updateLatencyLabel(chLat);
+            logM(sprintf('startLatency Esclavo %d tof_us=%d', node_id, tofUs));
+            return;
+        end
+
         % 0xFD — diagnóstico: master status o HELLO de esclavo
         if typ == 253
             if node_id == 255
@@ -1585,9 +1630,19 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
                 NODE_NAMES{ch}, nBatches, nSamples);
         end
         if ch >= 2 && isLiveHandle(driftLabels(ch-1)) && ~isempty(S.node(ch).driftHist)
-            driftLabels(ch-1).Text = sprintf('Esclavo %d: %s', ...
+            driftLabels(ch-1).Text = sprintf('S%d deriva: %s', ...
                 ch-1, formatDriftStats(S.node(ch).driftHist));
         end
+        if ch >= 2 && isLiveHandle(latencyLabels(ch-1)) && ~isempty(S.node(ch).startLatencyHist)
+            updateLatencyLabel(ch);
+        end
+    end
+
+    function updateLatencyLabel(ch)
+        if ch < 2 || ch > MAX_NODES, return; end
+        if ~isLiveHandle(latencyLabels(ch-1)), return; end
+        latencyLabels(ch-1).Text = sprintf('S%d: %s', ...
+            ch-1, formatLatencyStats(S.node(ch).startLatencyHist));
     end
 
     function s = formatDriftScalar(valueUs)
@@ -1600,8 +1655,36 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
 
     function s = formatDriftStats(valuesUs)
         mu = mean(valuesUs);
+        n = numel(valuesUs);
+        if n < 2
+            s = sprintf('%.6E±-- s n=%d', mu * 1e-6, n);
+            return;
+        end
         sig = std(valuesUs);
-        s = sprintf('%.6E±%.6E s', mu * 1e-6, sig * 1e-6);
+        s = sprintf('%.6E±%.6E s n=%d', mu * 1e-6, sig * 1e-6, n);
+    end
+
+    function s = formatLatencyStats(valuesUs)
+        if isempty(valuesUs)
+            s = '--';
+            return;
+        end
+        mu = mean(valuesUs) / 1000;
+        n = numel(valuesUs);
+        if n < 2
+            s = sprintf('%.3f±-- ms n=%d', mu, n);
+            return;
+        end
+        sig = std(valuesUs) / 1000;
+        s = sprintf('%.3f±%.3f ms n=%d', mu, sig, n);
+    end
+
+    function clearStartLatency(ch)
+        if ch < 2 || ch > MAX_NODES, return; end
+        S.node(ch).startLatencyHist = [];
+        if isLiveHandle(latencyLabels(ch-1))
+            latencyLabels(ch-1).Text = sprintf('S%d: --', ch-1);
+        end
     end
 
     function appCfg = makeConfigSnapshot()
@@ -1917,6 +2000,8 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
         for ch = 1:MAX_NODES
             driftMeanUs = safeStatF(S.node(ch).driftHist,'mean');
             driftStdUs  = safeStatF(S.node(ch).driftHist,'std');
+            startLatencyMeanUs = safeStatF(S.node(ch).startLatencyHist,'mean');
+            startLatencyStdUs  = safeStatF(S.node(ch).startLatencyHist,'std');
             muestras.node(ch).node_id          = ch-1;
             muestras.node(ch).name             = nodeDisplayName(ch);
             muestras.node(ch).default_name     = NODE_NAMES{ch};
@@ -1947,6 +2032,12 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
             muestras.node(ch).drift_s_hist     = S.node(ch).driftHist * 1e-6;
             muestras.node(ch).drift_s_mean     = driftMeanUs * 1e-6;
             muestras.node(ch).drift_s_std      = driftStdUs * 1e-6;
+            muestras.node(ch).start_latency_us_hist = S.node(ch).startLatencyHist;
+            muestras.node(ch).start_latency_us_mean = startLatencyMeanUs;
+            muestras.node(ch).start_latency_us_std  = startLatencyStdUs;
+            muestras.node(ch).start_latency_s_hist  = S.node(ch).startLatencyHist * 1e-6;
+            muestras.node(ch).start_latency_s_mean  = startLatencyMeanUs * 1e-6;
+            muestras.node(ch).start_latency_s_std   = startLatencyStdUs * 1e-6;
             muestras.node(ch).first_sample_us  = S.node(ch).tFirst;
             muestras.node(ch).got_first_sample = S.node(ch).gotFirst;
             muestras.node(ch).batch_count      = S.node(ch).batchCount;
@@ -1983,7 +2074,13 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
 
     function v = safeStatF(vec, tipo)
         if isempty(vec), v = NaN; return; end
-        if strcmp(tipo,'mean'), v = mean(vec); else, v = std(vec); end
+        if strcmp(tipo,'mean')
+            v = mean(vec);
+        elseif numel(vec) < 2
+            v = NaN;
+        else
+            v = std(vec);
+        end
     end
 
 %% ════════════════════════════════════════════════════════════════════════
