@@ -1,3 +1,4 @@
+%% 
 function InterfaceESP()
 % InterfaceESP — GUI multi-nodo geófono ESP32
 % Layout: TabGroup izquierdo (columna única) + plots a la derecha
@@ -33,7 +34,10 @@ CMD_DEBUG_RESPONSE = hex2dec('B0');
 MASTER_STATE_ARMED = 2;
 MASTER_STATE_PRESTART = 6;
 MASTER_STATE_SCOPE_MULTI = 7;
-PRESTART_WAIT_S = readBuildDefine(MASTER_PIO_INI, 'PRESTART_WAIT_MS', 5000) / 1000;
+HOTWAIT_QUERY_DELAY_S = readBuildDefine(MASTER_PIO_INI, 'HOTWAIT_QUERY_DELAY_MS', 20) / 1000;
+HOTWAIT_QUERY_TIMEOUT_S = readBuildDefine(MASTER_PIO_INI, 'HOTWAIT_QUERY_TIMEOUT_MS', 120) / 1000;
+HOTWAIT_QUERY_RETRIES = readBuildDefine(MASTER_PIO_INI, 'HOTWAIT_QUERY_RETRIES', 3);
+HOTWAIT_SETTLE_S = readBuildDefine(MASTER_PIO_INI, 'HOTWAIT_SETTLE_MS', 50) / 1000;
 SCOPE_MULTI_START_COUNT = readBuildDefine(MASTER_PIO_INI, 'SCOPE_MULTI_START_COUNT', 128);
 SCOPE_MULTI_START_GAP_S = readBuildDefine(MASTER_PIO_INI, 'SCOPE_MULTI_START_GAP_MS', 1000) / 1000;
 
@@ -829,9 +833,10 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
         end
         setDriftDebugSlaves(true);
         psocCmd(hex2dec('A3'), 0);
-        lblSyncSt.Text = sprintf('Estado: PRESTART drift (%.1f s)', PRESTART_WAIT_S);
+        waitBudget = hotWaitBudgetS();
+        lblSyncSt.Text = sprintf('Estado: HOT_WAIT drift (max %.1f s)', waitBudget);
         logM('driftMeasure START');
-        tmrDM = timer('StartDelay', PRESTART_WAIT_S + 1.5, ...
+        tmrDM = timer('StartDelay', waitBudget + 1.5, ...
             'ExecutionMode', 'singleShot', 'TimerFcn', @finishDrift);
         start(tmrDM);
         function finishDrift(~,~)
@@ -906,6 +911,13 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
         lblBatchInfo.Text = sprintf('%d bat → %d mts ≈ %.1f s', n, n*30, dur);
     end
 
+    function s = hotWaitBudgetS()
+        tries = max(1, HOTWAIT_QUERY_RETRIES + 1);
+        s = HOTWAIT_QUERY_DELAY_S + ...
+            max(0, S.nSlaves) * tries * HOTWAIT_QUERY_TIMEOUT_S + ...
+            HOTWAIT_SETTLE_S + 0.10;
+    end
+
     function onStreamOn(~,~)
         if S.streaming
             onStreamOff();
@@ -931,31 +943,35 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
             S.multiStartActive = true;
             S.recordingActive = false;
             btnStreamOn.Text = '■ Detener';
-            lblSyncSt.Text = sprintf('Estado: PRESTART multiples (%.1f s)', PRESTART_WAIT_S);
-            psocCmd(CMD_DEBUG_RESPONSE, S.nBatches);
-            logH(sprintf('Starts multiples: %d ciclos de %.1f s + START + %.1f s extra', ...
-                SCOPE_MULTI_START_COUNT, PRESTART_WAIT_S, SCOPE_MULTI_START_GAP_S));
-            logM(sprintf('scopeMulti START n=%d count=%d prestart=%.3fs gap=%.3fs', ...
-                S.nBatches, SCOPE_MULTI_START_COUNT, PRESTART_WAIT_S, SCOPE_MULTI_START_GAP_S));
+            waitBudget = hotWaitBudgetS();
+            lblSyncSt.Text = sprintf('Estado: HOT_WAIT multiples (max %.1f s)', waitBudget);
+            psocCmd(CMD_DEBUG_RESPONSE, 1);
+            logH(sprintf('Starts multiples: %d ciclos de HOT_WAIT + START + %.1f s extra', ...
+                SCOPE_MULTI_START_COUNT, SCOPE_MULTI_START_GAP_S));
+            logM(sprintf('scopeMulti START n=0 count=%d hotwaitMax=%.3fs gap=%.3fs', ...
+                SCOPE_MULTI_START_COUNT, waitBudget, SCOPE_MULTI_START_GAP_S));
             return;
         end
-        % El maestro reenvia config/ARM y espera PRESTART_WAIT_S antes del START real.
+        % El maestro manda PRESTART, confirma HOT_WAIT en cada esclavo y luego START.
         if S.streamDebug
+            psocCmd(hex2dec('AE'), S.nBatches);   % fijar n_batches ANTES de A7: maestro y esclavos ven g_rec_n_batches>0
+            setStreamDebugSignal(true);            % A7 con g_rec_n_batches>0 → maestro queda ARMED, esclavos ARMED (no SAMPLING)
             psocCmd(hex2dec('A3'), S.nBatches);
-            setStreamDebugSignal(true);   % prepara rampas debug durante PRESTART
         else
             psocCmd(hex2dec('A1'), 1);    % A1(1) → master stream live ADC real
             psocCmd(hex2dec('A3'), S.nBatches);
         end
         S.streaming = true;
         S.recordingActive = true;
+        S.prevMasterState = -1;   % forzar que el próximo heartbeat IDLE libere render
         btnStreamOn.Text = '■ Detener';
         durRec = S.nBatches * 30 / FS;
-        lblSyncSt.Text = sprintf('Estado: ESPERA START (%.1f s)', PRESTART_WAIT_S);
-        logH(sprintf('Iniciar: espera %.1f s + grabando %.1f s', PRESTART_WAIT_S, durRec));
-        logM(sprintf('CMD START store n=%d prestart=%.1fs', S.nBatches, PRESTART_WAIT_S));
+        waitBudget = hotWaitBudgetS();
+        lblSyncSt.Text = sprintf('Estado: HOT_WAIT → START (max %.1f s)', waitBudget);
+        logH(sprintf('Iniciar: HOT_WAIT + grabando %.1f s', durRec));
+        logM(sprintf('CMD START store n=%d hotwaitMax=%.1fs', S.nBatches, waitBudget));
         % Auto-stop: redondear a ms para evitar warning de precisión sub-ms
-        delayAS = round((PRESTART_WAIT_S + durRec + 1.5) * 1000) / 1000;
+        delayAS = round((waitBudget + durRec + 3.0) * 1000) / 1000;
         if delayAS < 0.001, delayAS = 0.001; end
         tmrAS = timer('StartDelay', delayAS, 'ExecutionMode', 'singleShot', ...
                       'TimerFcn', @doAutoStop);
@@ -1958,7 +1974,7 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
         switch masterState
             case MASTER_STATE_PRESTART
                 if S.multiStartActive && isLiveHandle(lblSyncSt)
-                    lblSyncSt.Text = sprintf('Estado: PRESTART multiples (%.1f s)', PRESTART_WAIT_S);
+                    lblSyncSt.Text = sprintf('Estado: HOT_WAIT multiples (max %.1f s)', hotWaitBudgetS());
                 end
             case MASTER_STATE_SCOPE_MULTI
                 if S.multiStartActive && isLiveHandle(lblSyncSt)
@@ -1986,7 +2002,7 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
             case 0   % IDLE — puede ser post-dump o inicio normal
                 if S.multiStartActive
                     finishMultipleStarts();
-                elseif S.dumpStarted
+                elseif S.dumpStarted || S.recordingActive
                     S.dumpStarted = false;
                     S.recordingActive = false;   % liberar render tras dump
                     S.renderDirty(:) = true;
