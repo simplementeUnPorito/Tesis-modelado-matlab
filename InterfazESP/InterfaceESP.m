@@ -299,6 +299,22 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
         uilabel(pN,'Text','Arm:','Position',[92 8 34 20]);
         uispinner(pN,'Position',[128 8 W-132 22],'Value',S.node(1).notchHarm, ...
             'Limits',[1 5],'ValueChangedFcn',@(sp,~)onNotchHarm(1,sp.Value));
+
+        % Debug COM Maestro (Serial1 del maestro, NO el USB binario de datos)
+        pDbg = uipanel(tab,'Title','Debug COM Maestro (Serial1, opcional)', ...
+            'Position',[4 4 W 486]);
+        uilabel(pDbg,'Text','Puerto serial:','Position',[4 442 80 20]);
+        mstDd = uidropdown(pDbg,'Position',[88 440 W-160 22], ...
+            'Items',listSerialPorts());
+        uibutton(pDbg,'Text','↺','Position',[W-68 440 64 22], ...
+            'ButtonPushedFcn',@(~,~) set(mstDd,'Items',listSerialPorts()));
+        mstBtnC = uibutton(pDbg,'Text','Conectar', 'Position',[4  414 90   22]);
+        mstBtnD = uibutton(pDbg,'Text','Desconectar','Position',[98 414 W-102 22],'Enable','off');
+        mstBtnC.ButtonPushedFcn = @(~,~) connectDbg(true,  1, mstDd, mstBtnC, mstBtnD);
+        mstBtnD.ButtonPushedFcn = @(~,~) disconnectDbg(true, 1, mstBtnC, mstBtnD);
+        mstTa = uitextarea(pDbg,'Position',[4 4 W-8 406], ...
+            'Editable','off','FontName','Courier New','FontSize',8);
+        S.node(1).dbgTa = mstTa;
     end
 
     function buildSlaveTab(ch, tab)
@@ -372,14 +388,15 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
         lblSalud    = uilabel(pD,'Text','●','Position',[140 46 22 26], ...
             'FontColor',[0.7 0.7 0.7],'FontSize',16);
         lblSaludTxt = uilabel(pD,'Text','Sin test','Position',[164 46 W-168 26]);
-        uilabel(pD,'Text','TX Mode:','Position',[4 14 58 20]);
-        ddTX = uidropdown(pD,'Position',[66 14 W-70 22],'Items',TX_MODE_ITEMS, ...
-            'Value',txModeName(S.node(ch).tx_mode), ...
-            'ValueChangedFcn',@(dd,~)sendTxMode(ch,dd.Value));
+        % "Ver": captura única de N lotes de este nodo (calibrar VDAC en vivo)
+        btnVer = uibutton(pD,'Text','Ver','Position',[4 10 80 24], ...
+            'ButtonPushedFcn',@(~,~)onVerNodo(ch));
+        uilabel(pD,'Text','captura única (calibra VDAC en vivo)', ...
+            'Position',[90 12 W-94 20],'FontSize',8);
         S.node(ch).btnTest     = btnTest;
         S.node(ch).lblSalud    = lblSalud;
         S.node(ch).lblSaludTxt = lblSaludTxt;
-        S.node(ch).ddTX        = ddTX;
+        S.node(ch).btnVer      = btnVer;
 
         % Stats
         pSt = uipanel(tab,'Title','Estadísticas','Position',[4 402 W 82]);
@@ -453,7 +470,7 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
             'ButtonPushedFcn',@onStreamOn,'Enable','off');
         uilabel(pSt,'Text','Batches:','Position',[4 66 66 18]);
         spnRecN = uispinner(pSt,'Position',[70 64 60 22], ...
-            'Value',80,'Limits',[1 255],'Step',1,'RoundFractionalValues',true, ...
+            'Value',80,'Limits',[1 65535],'Step',1,'RoundFractionalValues',true, ...
             'ValueChangedFcn',@(~,~)updateBatchInfoLabel());
         lblBatchInfo = uilabel(pSt,'Text','80 bat → 2400 mts ≈ 2.4 s', ...
             'Position',[136 64 W-140 22],'FontSize',8);
@@ -745,7 +762,7 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
         S.dumpStarted     = false;
         S.multiStartActive = false;
         S.prevMasterState = -1;
-        S.nBatches        = max(1, min(255, round(spnRecN.Value)));
+        S.nBatches        = max(1, min(65535, round(spnRecN.Value)));
         if ~isempty(S.autoStopTimer) && isvalid(S.autoStopTimer)
             try, stop(S.autoStopTimer); delete(S.autoStopTimer); catch, end
         end
@@ -832,7 +849,7 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
             S.node(chD).tFirst   = 0;
         end
         setDriftDebugSlaves(true);
-        psocCmd(hex2dec('A3'), 0);
+        psocCmd16(hex2dec('A3'), 0);
         waitBudget = hotWaitBudgetS();
         lblSyncSt.Text = sprintf('Estado: HOT_WAIT drift (max %.1f s)', waitBudget);
         logM('driftMeasure START');
@@ -905,7 +922,7 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
 
     function updateBatchInfoLabel()
         if ~isLiveHandle(spnRecN) || ~isLiveHandle(lblBatchInfo), return; end
-        n = max(1, min(255, round(spnRecN.Value)));
+        n = max(1, min(65535, round(spnRecN.Value)));
         S.nBatches = n;
         dur = n * 30 / FS;
         lblBatchInfo.Text = sprintf('%d bat → %d mts ≈ %.1f s', n, n*30, dur);
@@ -919,12 +936,13 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
     end
 
     function onStreamOn(~,~)
+        logM(sprintf('BTN Iniciar streaming=%d nBatches=%d', S.streaming, round(spnRecN.Value)));
         if S.streaming
             onStreamOff();
             return;
         end
         if S.nSlaves == 0, logH('Configura el nº de esclavos primero'); return; end
-        n = max(1, min(255, round(spnRecN.Value)));
+        n = max(1, min(65535, round(spnRecN.Value)));
         S.nBatches = n;
         updateBatchInfoLabel();
         % Limpiar todos los buffers para que cada grabación empiece desde cero
@@ -956,10 +974,10 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
         if S.streamDebug
             psocCmd(hex2dec('AE'), S.nBatches);   % fijar n_batches ANTES de A7: maestro y esclavos ven g_rec_n_batches>0
             setStreamDebugSignal(true);            % A7 con g_rec_n_batches>0 → maestro queda ARMED, esclavos ARMED (no SAMPLING)
-            psocCmd(hex2dec('A3'), S.nBatches);
+            psocCmd16(hex2dec('A3'), S.nBatches);
         else
             psocCmd(hex2dec('A1'), 1);    % A1(1) → master stream live ADC real
-            psocCmd(hex2dec('A3'), S.nBatches);
+            psocCmd16(hex2dec('A3'), S.nBatches);
         end
         S.streaming = true;
         S.recordingActive = true;
@@ -1324,6 +1342,39 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
             logM(sprintf('testEsclavo ch=%d batches=%d ok=%d',ch-1,g,ok));
             try, delete(tmrS); catch, end
         end
+    end
+
+    function onVerNodo(ch)
+        % "Ver": disparo único. El PSoC del nodo muestrea N lotes y los envía
+        % solo (sin esperar el START broadcast). Pseudo-tiempo-real para calibrar
+        % VDAC observando un único nodo.
+        if ch < 2 || ch > MAX_NODES, return; end
+        if isempty(S.port) || ~isvalid(S.port)
+            logH('Ver: conecta el maestro primero'); return;
+        end
+        if S.recordingActive
+            logH('Ver: grabación activa — espera a que termine'); return;
+        end
+        n = max(1, min(65535, round(spnRecN.Value)));
+        % Fijar N en el maestro (lo usa para MsgView). El esclavo objetivo entra
+        % en modo "sin store" (envío en vivo) en su handler de CMD_VIEW.
+        psocCmd16(hex2dec('AE'), n);
+        % Limpiar buffer del nodo y hacerlo visible para verlo en vivo
+        S.node(ch).notchBuf   = [];
+        S.node(ch).filtBuf    = [];
+        S.node(ch).batchCount = 0;
+        S.node(ch).visible    = true;
+        if isLiveHandle(cbVis(ch)), cbVis(ch).Value = true; end
+        if isLiveHandle(S.node(ch).hRaw)
+            set(S.node(ch).hRaw,  'XData', NaN, 'YData', NaN);
+            set(S.node(ch).hFilt, 'XData', NaN, 'YData', NaN);
+        end
+        S.streaming = true;
+        % Disparo dirigido: sub_cmd 0xB2 = Ver
+        enviarDirigido(ch, hex2dec('B2'), 1);
+        S.renderDirty(ch) = true;
+        logH(sprintf('Ver nodo Esclavo %d: captura única N=%d lotes', ch-1, n));
+        logM(sprintf('VER ch=%d n=%d', ch-1, n));
     end
 
 %% ════════════════════════════════════════════════════════════════════════
@@ -2221,6 +2272,21 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
         end
     end
 
+    function psocCmd16(cmd, value)
+        % Comando "set N" de 16 bits: [0xAB][cmd][n_lo][n_hi][cmd^n_lo^n_hi]
+        if isempty(S.port)||~isvalid(S.port), return; end
+        v   = uint16(max(0, min(65535, round(value))));
+        nlo = uint8(bitand(v,255));
+        nhi = uint8(bitshift(v,-8));
+        cs  = bitxor(bitxor(uint8(cmd),nlo),nhi);
+        try
+            write(S.port,uint8([CMD_HEADER,cmd,nlo,nhi,cs]),'uint8');
+            logM(sprintf('TX std16 cmd=0x%02X N=%d',cmd,v));
+        catch ME
+            logM(['TX err: ' ME.message]);
+        end
+    end
+
     function enviarDirigido(ch, sub_cmd, param)
         if isempty(S.port)||~isvalid(S.port), return; end
         ni=uint8(ch-1); sc=uint8(sub_cmd); p=uint8(param);
@@ -2257,7 +2323,11 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
         S.node(ch).dbgBuf  = '';
         btnC.Enable = 'off';
         btnD.Enable = 'on';
-        logH(sprintf('Debug COM esclavo %d conectado: %s', ch-1, portName));
+        if isMaster
+            logH(sprintf('Debug COM Maestro conectado: %s', portName));
+        else
+            logH(sprintf('Debug COM esclavo %d conectado: %s', ch-1, portName));
+        end
         if isempty(tmr) || ~isvalid(tmr)
             tmr = timer('ExecutionMode','fixedRate','Period',0.05, ...
                 'TimerFcn',@timerRX,'BusyMode','drop');
@@ -2278,14 +2348,18 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
         S.node(ch).dbgBuf  = '';
         btnC.Enable = 'on';
         btnD.Enable = 'off';
-        logH(sprintf('Debug COM esclavo %d desconectado', ch-1));
+        if isMaster
+            logH('Debug COM Maestro desconectado');
+        else
+            logH(sprintf('Debug COM esclavo %d desconectado', ch-1));
+        end
     end
 
     function pollAllDbg()
         for dCh = 1:MAX_NODES
             if ~isempty(S.node(dCh).dbgPort) && isvalid(S.node(dCh).dbgPort)
                 S.node(dCh).dbgBuf = drainDbgPort(S.node(dCh).dbgPort, ...
-                    S.node(dCh).dbgBuf, false, dCh, S.node(dCh).dbgTa);
+                    S.node(dCh).dbgBuf, (dCh == 1), dCh, S.node(dCh).dbgTa);
             end
         end
     end
@@ -2311,7 +2385,9 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
                         prefix = sprintf('S%d', ch-1);
                     end
                     msg = sprintf('[%s][%s] %s', ts, prefix, line);
-                    if isNoisyHumanLogLine(line)
+                    % Línea máquina (#M,...) o ruido humano → log máquina (todos
+                    % los datos). Resto → Log tab humano, ordenado por timestamp.
+                    if startsWith(string(line),'#M,') || isNoisyHumanLogLine(line)
                         logM(sprintf('DBG %s %s', prefix, line));
                     else
                         logH(msg);
