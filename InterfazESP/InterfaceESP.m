@@ -86,6 +86,7 @@ for ch = 1:MAX_NODES
     S.node(ch).startLatencyHist = [];
     S.node(ch).batchCount    = 0;
     S.node(ch).salud         = 0;
+    S.node(ch).psocOk        = [];   % [] = desconocido, true/false tras primer HELLO
     S.node(ch).tx_mode       = TX_RAW;
     S.node(ch).debugActive   = false;
     S.node(ch).gotFirst      = false;
@@ -106,9 +107,10 @@ for ch = 1:MAX_NODES
     S.node(ch).lblStats  = [];
     S.node(ch).lblLastVal= [];
     S.node(ch).lblFiltSt = [];
-    S.node(ch).dbgPort   = [];
-    S.node(ch).dbgBuf    = '';
-    S.node(ch).dbgTa     = [];
+    S.node(ch).dbgPort    = [];
+    S.node(ch).dbgBuf     = '';
+    S.node(ch).dbgTa      = [];
+    S.node(ch).dbgPending = {};
 end
 
 %% ── Handles UI en scope padre (compartidos entre nested functions) ───────
@@ -162,20 +164,20 @@ if ~isfolder(DATA_DIR), mkdir(DATA_DIR); end
 logStamp = datestr(now, 'yyyymmdd_HHMMSS');
 machLog = fullfile(LOG_DIR, sprintf('InterfaceESP_machine_%s.log', logStamp));
 humLog  = fullfile(LOG_DIR, sprintf('InterfaceESP_human_%s.log',  logStamp));
-iniciarLog(machLog, 'machine');
-iniciarLog(humLog,  'human');
+machFid = -1;
+humFid  = -1;
+machFid = iniciarLog(machLog, 'machine');
+humFid  = iniciarLog(humLog,  'human');
 cleanupOldLogs(LOG_DIR, N_LOG_SESSIONS);
 
-    function iniciarLog(f, tipo)
+    function fid = iniciarLog(f, tipo)
         fid = fopen(f,'w');
         if fid >= 0
             fprintf(fid,'=== InterfaceESP %s | %s ===\n', tipo, datestr(now, 'yyyy-mm-dd HH:MM:SS'));
-            fclose(fid);
         end
     end
-    function agregarLog(f, linea)
-        fid = fopen(f,'a');
-        if fid >= 0, fprintf(fid,'%s\n',linea); fclose(fid); end
+    function agregarLog(fid, linea)
+        if fid >= 0, fprintf(fid,'%s\n',linea); end
     end
     function cleanupOldLogs(logDir, maxSessions)
         cleanupLogPrefix(logDir, 'InterfaceESP_human_*.log', maxSessions);
@@ -534,9 +536,9 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
     function applyTabVisibility()
         % Retirar todos los tabs del tabgroup visible
         for t = 1:6, tabs(t).Parent = tgHidden; end
-        % Re-agregar en orden visual: Stream, Maestro, Esclavos, Log
+        % Re-agregar en orden visual: Stream, Esclavos, Log
+        % (Tab Maestro omitido: sus logs van a Serial1/GPIO16-17, no al USB de datos)
         tabs(5).Parent = tg;                  % Stream primero
-        tabs(1).Parent = tg;                  % Maestro siempre
         for slv = 1:S.nSlaves
             tabs(slv+1).Parent = tg;         % Esclavos activos
         end
@@ -1247,20 +1249,22 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
             g  = S.node(ch).batchCount - init0;
             ok = g >= 3;
             S.node(ch).salud = 1 + ~ok;
+            psocStr = psocStatusStr(ch);
             if ok
                 S.node(ch).lblSalud.FontColor   = [0.0 0.7 0.0];
-                S.node(ch).lblSaludTxt.Text     = 'OK';
-                logH(sprintf('Test Esclavo %d: OK',ch-1));
+                S.node(ch).lblSaludTxt.Text     = ['OK  ' psocStr];
+                logH(sprintf('Test Esclavo %d: OK  |  %s', ch-1, psocStr));
                 if ~isempty(S.node(ch).driftHist) && isLiveHandle(driftLabels(ch-1))
                     driftLabels(ch-1).Text = sprintf('S%d deriva: %s', ...
                         ch-1, formatDriftStats(S.node(ch).driftHist));
                 end
             else
                 S.node(ch).lblSalud.FontColor   = [0.8 0.1 0.1];
-                S.node(ch).lblSaludTxt.Text     = sprintf('FAIL (%d)',g);
-                logH(sprintf('Test Esclavo %d: FAIL (%d batches)',ch-1,g));
+                S.node(ch).lblSaludTxt.Text     = sprintf('FAIL (%d)  %s', g, psocStr);
+                logH(sprintf('Test Esclavo %d: FAIL (%d batches)  |  %s', ch-1, g, psocStr));
             end
-            logM(sprintf('testEsclavo ch=%d batches=%d ok=%d',ch-1,g,ok));
+            logM(sprintf('testEsclavo ch=%d batches=%d ok=%d psoc=%s', ...
+                ch-1, g, ok, psocStr));
             try, delete(tmrS); catch, end
         end
     end
@@ -1276,6 +1280,11 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
         if S.recordingActive
             logH('Ver: grabación activa — espera a que termine'); return;
         end
+        % Verificar que el PSoC esté detectado (HELLO con psoc_ok=1)
+        if ~isempty(S.node(ch).psocOk) && ~S.node(ch).psocOk
+            logH(sprintf('Ver Esclavo %d: PSoC no detectado — espera a que el esclavo lo encuentre', ch-1));
+            return;
+        end
         n = max(1, min(65535, round(spnRecN.Value)));
         % Fijar N en el maestro (lo usa para MsgView). El esclavo objetivo entra
         % en modo "sin store" (envío en vivo) en su handler de CMD_VIEW.
@@ -1286,6 +1295,7 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
         S.node(ch).batchCount = 0;
         S.node(ch).visible    = true;
         if isLiveHandle(cbVis(ch)), cbVis(ch).Value = true; end
+        updatePlotLayout();   % asegurar que el eje esté visible (Value programático no dispara callback)
         if isLiveHandle(S.node(ch).hRaw)
             set(S.node(ch).hRaw,  'XData', NaN, 'YData', NaN);
             set(S.node(ch).hFilt, 'XData', NaN, 'YData', NaN);
@@ -1296,6 +1306,36 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
         S.renderDirty(ch) = true;
         logH(sprintf('Ver nodo Esclavo %d: captura única N=%d lotes', ch-1, n));
         logM(sprintf('VER ch=%d n=%d', ch-1, n));
+        % Timeout: si no llegan lotes en el tiempo esperado, avisar y frenar el esclavo
+        toutSecs = max(3.0, n * 30 / FS * 1.5 + 1.0);
+        tmrVer = timer('StartDelay', toutSecs, 'ExecutionMode', 'singleShot', ...
+            'TimerFcn', @(~,~) verTimeout(ch));
+        start(tmrVer);
+    end
+
+    function s = psocStatusStr(ch)
+        if isempty(S.node(ch).psocOk)
+            s = 'PSoC: ?';
+        elseif S.node(ch).psocOk
+            s = 'PSoC: DETECTADO';
+        else
+            s = 'PSoC: no detectado';
+        end
+    end
+
+    function verTimeout(ch)
+        if S.node(ch).batchCount == 0
+            logH(sprintf('Ver Esclavo %d: timeout (%.1fs) — sin datos. ¿PSoC conectado?', ...
+                ch-1, max(3.0, round(spnRecN.Value) * 30 / FS * 1.5 + 1.0)));
+            logM(sprintf('VER_TIMEOUT ch=%d', ch-1));
+            if ~isempty(S.port) && isvalid(S.port)
+                % Limpiar g_rec_n_batches en el maestro ANTES del STOP para
+                % evitar que el maestro intente volcar datos que no existen.
+                psocCmd16(hex2dec('AE'), 0);
+                psocCmd(hex2dec('A4'), 0);
+            end
+            S.streaming = false;
+        end
     end
 
 %% ════════════════════════════════════════════════════════════════════════
@@ -1466,7 +1506,7 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
 
     function timerRX(~,~)
         try, checkRetries(); catch, end
-        pollAllDbg();
+        try, pollAllDbg(); catch, end
         if isempty(S.port) || ~isvalid(S.port), return; end
         try
             n = S.port.NumBytesAvailable;
@@ -1505,6 +1545,21 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
             totalRx = sum([S.node.batchCount]);
             lblDatos.Text = sprintf('Buf: %d mts  |  RX: %d mts', totalSamp, totalRx);
         end
+        % Volcar líneas de debug pendientes a sus textareas (batched, fuera del timer RX)
+        for dCh = 1:MAX_NODES
+            if ~isempty(S.node(dCh).dbgPending) && isLiveHandle(S.node(dCh).dbgTa)
+                ta = S.node(dCh).dbgTa;
+                try
+                    cur = ta.Value;
+                    if ischar(cur), cur = {cur}; end
+                    cur = [cur; S.node(dCh).dbgPending(:)];
+                    if numel(cur) > 80, cur = cur(end-79:end); end
+                    ta.Value = cur;
+                    scroll(ta,'bottom');
+                catch, end
+                S.node(dCh).dbgPending = {};
+            end
+        end
     end
 
     function changedCh = decodePkt(pkt)
@@ -1533,7 +1588,12 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
             if node_id == 255
                 logH(sprintf('Master: ESP-NOW=%s  ch=%d', ternary(b2==1,'OK','FAIL'), b1));
             else
-                logM(sprintf('HELLO node=%d', node_id));
+                % b2=0x01 = HELLO, b1 = psoc_ok (1=detectado, 0=no)
+                ch = node_id + 1;
+                if ch >= 2 && ch <= MAX_NODES
+                    S.node(ch).psocOk = (b1 == 1);
+                end
+                logM(sprintf('HELLO node=%d psoc=%d', node_id, b1));
             end
             return;
         end
@@ -2174,6 +2234,8 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
         guardarConfig();
         logH('Sesión cerrada');
         logM('onClose');
+        try, if machFid >= 0, fclose(machFid); machFid = -1; end; catch, end
+        try, if humFid >= 0,  fclose(humFid);  humFid  = -1; end; catch, end
         delete(fig);
     end
 
@@ -2279,12 +2341,12 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
         for dCh = 1:MAX_NODES
             if ~isempty(S.node(dCh).dbgPort) && isvalid(S.node(dCh).dbgPort)
                 S.node(dCh).dbgBuf = drainDbgPort(S.node(dCh).dbgPort, ...
-                    S.node(dCh).dbgBuf, (dCh == 1), dCh, S.node(dCh).dbgTa);
+                    S.node(dCh).dbgBuf, (dCh == 1), dCh);
             end
         end
     end
 
-    function newBuf = drainDbgPort(sp, buf, isMaster, ch, ta)
+    function newBuf = drainDbgPort(sp, buf, isMaster, ch)
         newBuf = buf;
         try
             nb = sp.NumBytesAvailable;
@@ -2305,22 +2367,15 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
                         prefix = sprintf('S%d', ch-1);
                     end
                     msg = sprintf('[%s][%s] %s', ts, prefix, line);
-                    % Línea máquina (#M,...) o ruido humano → log máquina (todos
-                    % los datos). Resto → Log tab humano, ordenado por timestamp.
+                    % Línea máquina (#M,...) o ruido humano → solo log máquina.
+                    % Resto → Log tab humano + acumular en textarea del nodo.
                     if startsWith(string(line),'#M,') || isNoisyHumanLogLine(line)
                         logM(sprintf('DBG %s %s', prefix, line));
                     else
                         logH(msg);
                     end
-                    % Actualizar textarea
-                    if isLiveHandle(ta)
-                        cur = ta.Value;
-                        if ischar(cur), cur = {cur}; end
-                        cur{end+1} = msg;
-                        if numel(cur) > 80, cur = cur(end-79:end); end
-                        ta.Value = cur;
-                        scroll(ta,'bottom');
-                    end
+                    % Acumular en buffer pendiente — timerRenderFcn vuelca a la textarea
+                    S.node(ch).dbgPending{end+1} = msg;
                 end
                 newBuf = '';
             else
@@ -2362,7 +2417,7 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
     function logH(msg)
         ts   = datestr(now,'HH:MM:SS');
         line = sprintf('[%s] %s',ts,msg);
-        agregarLog(humLog,line);
+        agregarLog(humFid,line);
         cur = taLog.Value;
         if ischar(cur), cur = {cur}; end
         cur = [cur; {line}];
@@ -2373,7 +2428,7 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
 
     function logM(msg)
         ts   = datestr(now,'HH:MM:SS.FFF');
-        agregarLog(machLog, sprintf('[%s] %s',ts,msg));
+        agregarLog(machFid, sprintf('[%s] %s',ts,msg));
     end
 
     function val = readBuildDefine(iniPath, defineName, defaultVal)
