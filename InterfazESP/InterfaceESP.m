@@ -91,6 +91,7 @@ for ch = 1:MAX_NODES
     S.node(ch).debugActive   = false;
     S.node(ch).gotFirst      = false;
     S.node(ch).tFirst        = 0;
+    S.node(ch).fs            = FS;    % Hz reportado por PSoC; se actualiza con HELLO
     S.node(ch).notchEnabled  = false;
     S.node(ch).notchMu       = 0.002;
     S.node(ch).notchHarm     = 3;
@@ -148,7 +149,7 @@ if isfile(CFG_FILE)
                 if ~isempty(S.node(ch).filtB)
                     S.node(ch).filtZi = zeros(1,max(0,length(S.node(ch).filtB)-1));
                 elseif ~isempty(S.node(ch).filtCmd)
-                    S.node(ch).filtB = compileFirCommand(S.node(ch).filtCmd);
+                    S.node(ch).filtB = compileFirCommand(S.node(ch).filtCmd, ch);
                     if ~isempty(S.node(ch).filtB)
                         S.node(ch).filtZi = zeros(1,max(0,length(S.node(ch).filtB)-1));
                     end
@@ -754,6 +755,32 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
             S.armPending = false;
             if isLiveHandle(btnArm), btnArm.Text = 'Descubrir'; end
         end
+    end
+
+    function checkFsConsistency()
+        if S.nSlaves == 0, return; end
+        fsVals = zeros(1, S.nSlaves);
+        fsKnown = false(1, S.nSlaves);
+        for k = 1:S.nSlaves
+            ch = k + 1;
+            fsVals(k)  = S.node(ch).fs;
+            fsKnown(k) = (S.node(ch).fs ~= FS);  % fue actualizado desde el dispositivo
+        end
+        if ~any(fsKnown)
+            logH('ARM: FS no reportada aún (esperando HELLO de esclavos)');
+            return;
+        end
+        parts = {};
+        for k = 1:S.nSlaves
+            parts{end+1} = sprintf('S%d=%dHz', k, fsVals(k)); %#ok<AGROW>
+        end
+        fsStr = strjoin(parts, '  ');
+        if ~all(fsVals == fsVals(1))
+            logH(sprintf('ADVERTENCIA: esclavos con distintas frecuencias de muestreo — %s', fsStr));
+        else
+            logH(sprintf('ARM: todos los esclavos a %d Hz', fsVals(1)));
+        end
+        logM(sprintf('fs_check: %s', fsStr));
     end
 
     function cancelArmDrift()
@@ -1422,7 +1449,7 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
         if isempty(S.node(ch).notchBuf)
             dc = NaN;
         else
-            dc = mean(S.node(ch).notchBuf(max(1,end-FS+1):end));
+            dc = mean(S.node(ch).notchBuf(max(1,end-S.node(ch).fs+1):end));
         end
         S.node(ch).cal(code+1,:) = [code, S.node(ch).vdac_byte, dc];
         S.node(ch).calValid(code+1) = true;
@@ -1452,20 +1479,18 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
     function applyFir(ch, cmdStr)
         cmdStr = strtrim(cmdStr);
         if isempty(cmdStr), return; end
-        try
-            b = eval(cmdStr);
-            if ~isvector(b)||~isnumeric(b), error('No es vector'); end
-            b = b(:)'/sum(abs(b));
-            S.node(ch).filtB   = b;
-            S.node(ch).filtCmd = cmdStr;
-            S.node(ch).filtZi  = zeros(1,length(b)-1);
-            S.node(ch).lblFiltSt.Text = sprintf('FIR %d coefs',length(b));
-            S.node(ch).hFilt.Visible  = 'on';
-            logH(sprintf('Nodo %d FIR %d coefs',ch-1,length(b)));
-            logM(sprintf('FIR ch=%d n=%d cmd="%s"',ch-1,length(b),cmdStr));
-        catch ME
-            logH(['FIR error: ' ME.message]);
+        b = compileFirCommand(cmdStr, ch);
+        if isempty(b)
+            logH('FIR error: expresión/atajo inválido o coeficientes vacíos');
+            return;
         end
+        S.node(ch).filtB   = b;
+        S.node(ch).filtCmd = cmdStr;
+        S.node(ch).filtZi  = zeros(1,length(b)-1);
+        S.node(ch).lblFiltSt.Text = sprintf('FIR %d coefs',length(b));
+        S.node(ch).hFilt.Visible  = 'on';
+        logH(sprintf('Nodo %d FIR %d coefs (fs=%dHz)',ch-1,length(b),S.node(ch).fs));
+        logM(sprintf('FIR ch=%d n=%d fs=%d cmd="%s"',ch-1,length(b),S.node(ch).fs,cmdStr));
     end
 
     function removeFir(ch)
@@ -1588,12 +1613,17 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
             if node_id == 255
                 logH(sprintf('Master: ESP-NOW=%s  ch=%d', ternary(b2==1,'OK','FAIL'), b1));
             else
-                % b2=0x01 = HELLO, b1 = psoc_ok (1=detectado, 0=no)
+                % b2=0x01 = HELLO, b1=psoc_ok, b0=fs/100 (0=desconocido)
                 ch = node_id + 1;
                 if ch >= 2 && ch <= MAX_NODES
                     S.node(ch).psocOk = (b1 == 1);
+                    if b0 > 0
+                        S.node(ch).fs = b0 * 100;
+                        if isLiveHandle(S.node(ch).lblStats), updateStats(ch); end
+                    end
                 end
-                logM(sprintf('HELLO node=%d psoc=%d', node_id, b1));
+                fs_str = ternary(b0 > 0, sprintf(' fs=%dHz', b0*100), '');
+                logM(sprintf('HELLO node=%d psoc=%d%s', node_id, b1, fs_str));
             end
             return;
         end
@@ -1636,6 +1666,7 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
                 end
                 logH(sprintf('READY: %d esclavos',b2));
                 logM(sprintf('READY n=%d',b2));
+                checkFsConsistency();
         end
     end
 
@@ -1657,7 +1688,7 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
         % Cancelador 50 Hz (por nodo)
         if S.node(ch).notchEnabled
             [sv, S.node(ch).lineW] = lineCanceller(S.node(ch).notchBuf(end), ...
-                S.node(ch).lineW, S.node(ch).batchCount, FS, 50, ...
+                S.node(ch).lineW, S.node(ch).batchCount, S.node(ch).fs, 50, ...
                 S.node(ch).notchHarm, S.node(ch).notchMu);
             S.node(ch).notchBuf(end) = sv;
         end
@@ -1707,8 +1738,9 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
                 S.node(ch).lblStats.Text = sprintf('Mts: %d  Bat: %d', ...
                     nSamples, nBatches);
             else
-                S.node(ch).lblStats.Text = sprintf('Mts: %d  Bat: %d  Drift: %s', ...
-                    nSamples, nBatches, dStr);
+                fsLbl = ternary(S.node(ch).fs ~= FS, sprintf('  FS:%dHz',S.node(ch).fs), '');
+                S.node(ch).lblStats.Text = sprintf('Mts: %d  Bat: %d  Drift: %s%s', ...
+                    nSamples, nBatches, dStr, fsLbl);
             end
         end
         if ~isempty(S.node(ch).notchBuf) && isLiveHandle(S.node(ch).lblLastVal)
@@ -1879,7 +1911,7 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
         elseif isfield(nodeCfg,'filtB')
             S.node(chCfg).filtB = nodeCfg.filtB;
         elseif ~isempty(S.node(chCfg).filtCmd)
-            S.node(chCfg).filtB = compileFirCommand(S.node(chCfg).filtCmd);
+            S.node(chCfg).filtB = compileFirCommand(S.node(chCfg).filtCmd, chCfg);
         end
         if ~isempty(S.node(chCfg).filtB)
             S.node(chCfg).filtZi = zeros(1,max(0,length(S.node(chCfg).filtB)-1));
@@ -1897,17 +1929,62 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
         if isfield(nodeCfg,'visible'), S.node(chCfg).visible = logical(nodeCfg.visible); end
     end
 
-    function b = compileFirCommand(cmdStr)
+    function b = compileFirCommand(cmdStr, ch)
         b = [];
         cmdStr = strtrim(cmdStr);
         if isempty(cmdStr), return; end
+        fsHz = S.node(ch).fs;                 % fs reportada por el nodo (HELLO); FS es solo el valor nominal de arranque
+        if ~isnumeric(fsHz) || isempty(fsHz) || fsHz <= 0, fsHz = FS; end
         try
-            b = eval(cmdStr);
+            b = parseFilterShorthand(cmdStr, fsHz);
+            if isempty(b)
+                fs = fsHz; %#ok<NASGU> % disponible para expresiones tipo fir1(64,[235 245]/(fs/2),'stop')
+                b = eval(cmdStr);
+            end
             if ~isvector(b) || ~isnumeric(b), b = []; return; end
             b = b(:)' / sum(abs(b));
         catch
             b = [];
         end
+    end
+
+    function b = parseFilterShorthand(cmdStr, fsHz)
+        % Atajos de texto: "lp Fc" | "hp Fc" | "bp F1 F2" | "sb Fc" | "sb F1 F2"
+        % (lowpass / highpass / bandpass / stopband-notch), diseñados con fir1
+        % usando la fs real del nodo (fsHz). Devuelve [] si cmdStr no matchea
+        % el atajo, para que compileFirCommand caiga al eval() genérico.
+        b = [];
+        toks = strsplit(lower(cmdStr));
+        if numel(toks) < 2, return; end
+        key = toks{1};
+        if ~any(strcmp(key, {'lp','hp','bp','sb','notch'})), return; end
+        nums = str2double(toks(2:end));
+        if isempty(nums) || any(isnan(nums)), return; end
+        nyq      = fsHz / 2;
+        ORDER    = 64;   % orden FIR por defecto (fir1 lo ajusta a par si hace falta)
+        NOTCH_BW = 10;   % Hz de ancho total cuando "sb" recibe solo la frecuencia central
+        switch key
+            case 'lp'
+                if numel(nums) ~= 1, return; end
+                b = fir1(ORDER, nums(1)/nyq, 'low');
+            case 'hp'
+                if numel(nums) ~= 1, return; end
+                b = fir1(ORDER, nums(1)/nyq, 'high');
+            case 'bp'
+                if numel(nums) ~= 2, return; end
+                b = fir1(ORDER, sort(nums)/nyq, 'bandpass');
+            case {'sb','notch'}
+                if numel(nums) == 1
+                    band = [nums(1)-NOTCH_BW/2, nums(1)+NOTCH_BW/2];
+                elseif numel(nums) == 2
+                    band = sort(nums);
+                else
+                    return
+                end
+                band = min(max(band, 0.01), nyq-0.01);
+                b = fir1(ORDER, band/nyq, 'stop');
+        end
+        b = b(:)';
     end
 
     function txt = firStatusText(chCfg)
