@@ -17,3 +17,4 @@
 /SM-24/init_SM24_cache.mat filter=lfs diff=lfs merge=lfs -text
 /SM-24/slprj/modeladvisor/SM24_model_W/570/ModelAdvisorData filter=lfs diff=lfs merge=lfs -text
 /InterfazCircuitoAnalogicoSimple/datos/InvertiveBP.mat filter=lfs diff=lfs merge=lfs -text
+/init_SM24_cache.mat filter=lfs diff=lfs merge=lfs -text
