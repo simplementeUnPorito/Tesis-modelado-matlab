@@ -1,0 +1,8 @@
+# MATLAB generated cache/build artefacts — do not commit
+*.slxc
+*.mexw64
+*.mexmaci64
+*.asv
+slprj/
+codegen/
+*_cache.mat
