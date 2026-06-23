@@ -1,0 +1,6 @@
+-I"C:/Github/Tesis/src/matlab/Simulaciones Controladores/Desacople"
+-I"C:/Github/Tesis/src/matlab/Simulaciones Controladores/Desacople/Subsystem_grt_rtw"
+-I"C:/Program Files/MATLAB/R2025b/extern/include"
+-I"C:/Program Files/MATLAB/R2025b/simulink/include"
+-I"C:/Program Files/MATLAB/R2025b/rtw/c/src"
+-I"C:/Program Files/MATLAB/R2025b/rtw/c/src/ext_mode/common"
