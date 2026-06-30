@@ -1613,17 +1613,30 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
             if node_id == 255
                 logH(sprintf('Master: ESP-NOW=%s  ch=%d', ternary(b2==1,'OK','FAIL'), b1));
             else
-                % b2=0x01 = HELLO, b1=psoc_ok, b0=fs/100 (0=desconocido)
                 ch = node_id + 1;
-                if ch >= 2 && ch <= MAX_NODES
-                    S.node(ch).psocOk = (b1 == 1);
-                    if b0 > 0
-                        S.node(ch).fs = b0 * 100;
+                if b2 == 5
+                    fs_exact = b1*256 + b0;
+                    if ch >= 2 && ch <= MAX_NODES && fs_exact > 0
+                        S.node(ch).fs = fs_exact;
                         if isLiveHandle(S.node(ch).lblStats), updateStats(ch); end
                     end
+                    logM(sprintf('HELLO node=%d fs_exact=%dHz', node_id, fs_exact));
+                elseif b2 == 1
+                    % b2=0x01 = HELLO legacy, b1=psoc_ok, b0=fs/100 (0=desconocido)
+                    if ch >= 2 && ch <= MAX_NODES
+                        S.node(ch).psocOk = (b1 == 1);
+                        if b0 > 0
+                            S.node(ch).fs = b0 * 100;
+                            if isLiveHandle(S.node(ch).lblStats), updateStats(ch); end
+                        end
+                    end
+                    fs_str = ternary(b0 > 0, sprintf(' fs=%dHz', b0*100), '');
+                    logM(sprintf('HELLO node=%d psoc=%d%s', node_id, b1, fs_str));
+                elseif b2 >= 2 && b2 <= 4
+                    % MAC byte-pair packet, handled by newer web/Python clients.
+                else
+                    logM(sprintf('STATUS node=%d b=[%d,%d,%d]', node_id, b2, b1, b0));
                 end
-                fs_str = ternary(b0 > 0, sprintf(' fs=%dHz', b0*100), '');
-                logM(sprintf('HELLO node=%d psoc=%d%s', node_id, b1, fs_str));
             end
             return;
         end
