@@ -34,7 +34,7 @@
 % LIBRERÍA USADA
 %   MASWaves_dispersion_imaging(u, N, x, fs, cT_min, cT_max, delta_cT)
 %   MASWaves_theoretical_dispersion_curve(c_test, lambda, h, alpha, beta, rho, n)
-%   Disponibles vía init_project() → genpath(third_party/MASW-Matlab-code/)
+%   Disponibles vía init_project() → genpath(third-party/MASW-Matlab-code/)
 %
 % CÓMO CORRER
 %   >> init_project()

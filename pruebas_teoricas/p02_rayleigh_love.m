@@ -22,7 +22,7 @@
 % LIBRERÍA USADA
 %   MASWaves_theoretical_dispersion_curve() — dynamic stiffness matrix method
 %   (Foti Ec. 2.74: Φ_R = 0, búsqueda de raíces por cambio de signo del det.)
-%   Disponible en third_party/MASW-Matlab-code/, incluida por init_project().
+%   Disponible en third-party/MASW-Matlab-code/, incluida por init_project().
 %
 % CÓMO CORRER
 %   >> init_project()         % desde src/matlab/

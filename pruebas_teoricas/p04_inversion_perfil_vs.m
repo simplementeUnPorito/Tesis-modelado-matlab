@@ -25,7 +25,7 @@
 % FUNCIÓN CLAVE
 %   MASWaves_theoretical_dispersion_curve(c_test, lambda, h, alpha, beta, rho, n)
 %   MASWaves_misfit(c_t, c_curve0)
-%   — ambas disponibles vía init_project() → genpath(third_party/MASW-Matlab-code/)
+%   — ambas disponibles vía init_project() → genpath(third-party/MASW-Matlab-code/)
 %
 % NOTA TÉCNICA: DIMENSIONES DE MASWaves
 %   MASWaves_theoretical_dispersion_curve retorna:

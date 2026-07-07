@@ -3,7 +3,7 @@ function project_root = init_project()
 %
 % Agrega al path:
 %   - src/matlab
-%   - third_party/MASW-Matlab-code
+%   - third-party/MASW-Matlab-code
 %
 % Devuelve:
 %   project_root -> ruta absoluta a la raíz del proyecto
@@ -17,7 +17,7 @@ function project_root = init_project()
     project_root = fileparts(fileparts(this_dir));
 
     matlab_src = fullfile(project_root, 'src', 'matlab');
-    masw_path  = fullfile(project_root, 'third_party', 'MASW-Matlab-code');
+    masw_path  = fullfile(project_root, 'third-party', 'MASW-Matlab-code');
 
     % Verificaciones mínimas
     if ~isfolder(matlab_src)
@@ -27,7 +27,7 @@ function project_root = init_project()
 
     if ~isfolder(masw_path)
         warning('init_project:MissingThirdParty', ...
-            'No existe la carpeta third_party esperada: %s', masw_path);
+            'No existe la carpeta third-party esperada: %s', masw_path);
     end
 
     % Agregar paths evitando duplicación innecesaria
