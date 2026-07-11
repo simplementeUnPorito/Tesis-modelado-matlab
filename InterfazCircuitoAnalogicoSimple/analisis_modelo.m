@@ -75,7 +75,7 @@ if ~isfield(d,'muestras'), error('Sin campo "muestras".'); end
 muestras = d.muestras;
 N = numel(muestras);
 
-ent = struct('nombre','','fs',1020,'fMin',0,'fMax',0,'ganancia',1,'observ','');
+ent = struct('nombre','','fs',2604,'fMin',0,'fMax',0,'ganancia',1,'observ','');
 if isfield(d,'entidad'), ent = d.entidad; end
 
 fprintf('\n%-4s  %-8s  %-20s  %6s  %8s  %6s  %6s  %s\n', ...

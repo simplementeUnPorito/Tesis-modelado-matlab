@@ -13,7 +13,7 @@ BAUD         = 921600;
 PKT_HEADER   = hex2dec('56');
 CMD_HEADER   = hex2dec('AB');
 CMD_DIRECTED = hex2dec('BD');
-FS           = 1020;        % Hz
+FS           = 2604;        % Hz nativos (N=1); HELLO exacto actualiza cada nodo
 DISP_SAMP    = FS * 3;
 VDAC_STEP    = 0.004;       % V/LSB
 NODE_NAMES   = {'Maestro','Esclavo 1','Esclavo 2','Esclavo 3'};
@@ -92,6 +92,7 @@ for ch = 1:MAX_NODES
     S.node(ch).gotFirst      = false;
     S.node(ch).tFirst        = 0;
     S.node(ch).fs            = FS;    % Hz reportado por PSoC; se actualiza con HELLO
+    S.node(ch).fsKnown       = false; % evita confundir el default con un HELLO exacto igual a 2604
     S.node(ch).notchEnabled  = false;
     S.node(ch).notchMu       = 0.002;
     S.node(ch).notchHarm     = 3;
@@ -764,7 +765,7 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
         for k = 1:S.nSlaves
             ch = k + 1;
             fsVals(k)  = S.node(ch).fs;
-            fsKnown(k) = (S.node(ch).fs ~= FS);  % fue actualizado desde el dispositivo
+            fsKnown(k) = S.node(ch).fsKnown;
         end
         if ~any(fsKnown)
             logH('ARM: FS no reportada aún (esperando HELLO de esclavos)');
@@ -781,6 +782,19 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
             logH(sprintf('ARM: todos los esclavos a %d Hz', fsVals(1)));
         end
         logM(sprintf('fs_check: %s', fsStr));
+    end
+
+    function fsHz = currentAcquisitionFs()
+        % Primera Fs confirmada de un esclavo activo; FS es solo el fallback
+        % nativo de arranque mientras todavía no llegó el HELLO exacto.
+        fsHz = FS;
+        for kFs = 1:max(0, S.nSlaves)
+            chFs = kFs + 1;
+            if S.node(chFs).fsKnown && S.node(chFs).fs > 0
+                fsHz = S.node(chFs).fs;
+                return;
+            end
+        end
     end
 
     function cancelArmDrift()
@@ -905,7 +919,7 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
         if ~isLiveHandle(spnRecN) || ~isLiveHandle(lblBatchInfo), return; end
         n = max(1, min(65535, round(spnRecN.Value)));
         S.nBatches = n;
-        dur = n * 30 / FS;
+        dur = n * 30 / currentAcquisitionFs();
         lblBatchInfo.Text = sprintf('%d bat → %d mts ≈ %.1f s', n, n*30, dur);
     end
 
@@ -964,7 +978,7 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
         S.recordingActive = true;
         S.prevMasterState = -1;   % forzar que el próximo heartbeat IDLE libere render
         btnStreamOn.Text = '■ Detener';
-        durRec = S.nBatches * 30 / FS;
+        durRec = S.nBatches * 30 / currentAcquisitionFs();
         waitBudget = hotWaitBudgetS();
         lblSyncSt.Text = sprintf('Estado: HOT_WAIT → START (max %.1f s)', waitBudget);
         logH(sprintf('Iniciar: HOT_WAIT + grabando %.1f s', durRec));
@@ -1334,7 +1348,8 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
         logH(sprintf('Ver nodo Esclavo %d: captura única N=%d lotes', ch-1, n));
         logM(sprintf('VER ch=%d n=%d', ch-1, n));
         % Timeout: si no llegan lotes en el tiempo esperado, avisar y frenar el esclavo
-        toutSecs = max(3.0, n * 30 / FS * 1.5 + 1.0);
+        fsNode = max(1, S.node(ch).fs);
+        toutSecs = max(3.0, n * 30 / fsNode * 1.5 + 1.0);
         tmrVer = timer('StartDelay', toutSecs, 'ExecutionMode', 'singleShot', ...
             'TimerFcn', @(~,~) verTimeout(ch));
         start(tmrVer);
@@ -1353,7 +1368,7 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
     function verTimeout(ch)
         if S.node(ch).batchCount == 0
             logH(sprintf('Ver Esclavo %d: timeout (%.1fs) — sin datos. ¿PSoC conectado?', ...
-                ch-1, max(3.0, round(spnRecN.Value) * 30 / FS * 1.5 + 1.0)));
+                ch-1, max(3.0, round(spnRecN.Value) * 30 / max(1, S.node(ch).fs) * 1.5 + 1.0)));
             logM(sprintf('VER_TIMEOUT ch=%d', ch-1));
             if ~isempty(S.port) && isvalid(S.port)
                 % Limpiar g_rec_n_batches en el maestro ANTES del STOP para
@@ -1618,6 +1633,7 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
                     fs_exact = b1*256 + b0;
                     if ch >= 2 && ch <= MAX_NODES && fs_exact > 0
                         S.node(ch).fs = fs_exact;
+                        S.node(ch).fsKnown = true;
                         if isLiveHandle(S.node(ch).lblStats), updateStats(ch); end
                     end
                     logM(sprintf('HELLO node=%d fs_exact=%dHz', node_id, fs_exact));
@@ -1627,6 +1643,7 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
                         S.node(ch).psocOk = (b1 == 1);
                         if b0 > 0
                             S.node(ch).fs = b0 * 100;
+                            S.node(ch).fsKnown = true;
                             if isLiveHandle(S.node(ch).lblStats), updateStats(ch); end
                         end
                     end
@@ -1751,7 +1768,7 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
                 S.node(ch).lblStats.Text = sprintf('Mts: %d  Bat: %d', ...
                     nSamples, nBatches);
             else
-                fsLbl = ternary(S.node(ch).fs ~= FS, sprintf('  FS:%dHz',S.node(ch).fs), '');
+                fsLbl = ternary(S.node(ch).fsKnown, sprintf('  FS:%dHz',S.node(ch).fs), '');
                 S.node(ch).lblStats.Text = sprintf('Mts: %d  Bat: %d  Drift: %s%s', ...
                     nSamples, nBatches, dStr, fsLbl);
             end
@@ -1825,7 +1842,7 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
     function appCfg = makeConfigSnapshot()
         appCfg.version = 3;
         appCfg.saved_at = datestr(now);
-        appCfg.fs = FS;
+        appCfg.fs = currentAcquisitionFs();
         appCfg.max_nodes = MAX_NODES;
         appCfg.vdac_step_volts = VDAC_STEP;
         appCfg.node_names = NODE_NAMES;
@@ -1882,6 +1899,8 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
         nodeCfg.tx_mode = uint8(txModeCode(S.node(chCfg).tx_mode));
         nodeCfg.tx_mode_name = txModeName(S.node(chCfg).tx_mode);
         nodeCfg.debug_on_start = (nodeCfg.tx_mode == TX_DEBUG);
+        nodeCfg.fs = S.node(chCfg).fs;
+        nodeCfg.fs_known = S.node(chCfg).fsKnown;
     end
 
     function applyConfigSnapshot(appCfg)
@@ -2186,7 +2205,7 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
 
         muestras.version       = 3;
         muestras.fecha         = datestr(now);
-        muestras.fs            = FS;
+        muestras.fs            = currentAcquisitionFs();
         muestras.nSlaves       = S.nSlaves;
         muestras.hammer_tip    = S.hammerTip;
         muestras.tx_mode_items = TX_MODE_ITEMS;
@@ -2241,6 +2260,8 @@ applyPlotVisibility();  % ocultar plots de esclavos inactivos al arrancar
             muestras.node(ch).batch_count      = S.node(ch).batchCount;
             muestras.node(ch).salud            = S.node(ch).salud;
             muestras.node(ch).visible          = S.node(ch).visible;
+            muestras.node(ch).fs               = S.node(ch).fs;
+            muestras.node(ch).fs_known         = S.node(ch).fsKnown;
             muestras.node(ch).config           = appCfg.node(ch);
         end
         if S.nSlaves > 0

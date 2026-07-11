@@ -52,7 +52,7 @@ d = load(fullfile(datosDir, fname));
 if ~isfield(d, 'muestras')
     error('El archivo no contiene el campo "muestras".'); end
 
-ent      = struct('nombre','','fs',1020,'fMin',0,'fMax',0,'ganancia',1,'observ','');
+ent      = struct('nombre','','fs',2604,'fMin',0,'fMax',0,'ganancia',1,'observ','');
 if isfield(d,'entidad'), ent = d.entidad; end
 muestras = d.muestras;
 N        = numel(muestras);

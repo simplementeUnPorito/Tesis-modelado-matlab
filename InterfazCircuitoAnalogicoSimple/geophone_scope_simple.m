@@ -80,7 +80,7 @@ function geophone_scope_simple()
     S.rxBadTypes  = 0;
     S.rxFrames    = 0;
 
-    S.fs    = 1020;
+    S.fs    = 2604;
     S.tWin  = 5000;
 
     S.yAuto  = true;   S.yMin = -S.vref_halfmv/1000;  S.yMax = S.vref_halfmv/1000;
@@ -1085,7 +1085,7 @@ function geophone_scope_simple()
     % CRUD entidades
     % =====================================================================
     function onNuevaEntidad(~,~)
-        abrirDialogoEntidad(struct('nombre','','fs',1020,'fMin',1,'fMax',510,...
+        abrirDialogoEntidad(struct('nombre','','fs',2604,'fMin',1,'fMax',1302,...
             'ganancia',1,'observ',''), false, 0);
     end
     function onEditarEntidad(~,~)

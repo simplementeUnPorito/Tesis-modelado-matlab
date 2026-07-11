@@ -31,7 +31,7 @@ clc; close all; clear;
 % =========================================================================
 %% PARÁMETROS CONFIGURABLES
 % =========================================================================
-WIN_WELCH    = 2^14;   % 16384 muestras → Δf ≈ 0.062 Hz a 1020 SPS
+WIN_WELCH    = 2^14;   % 16384 muestras → Δf ≈ 0.159 Hz a 2604 SPS
 OVL_WELCH    = 2^13;   % 50% solapamiento
 NFFT_WELCH   = 2^14;
 F_BANDA_BAJA = 0.1;    % Hz — fallback fMin
@@ -60,7 +60,7 @@ for f = dir(fullfile(datosDir,'*.mat'))'
     try
         d = load(fullfile(datosDir, f.name));
         if ~isfield(d,'muestras'), continue; end
-        ent = struct('nombre','','fs',1020,'fMin',0,'fMax',0,'ganancia',1,'observ','');
+        ent = struct('nombre','','fs',2604,'fMin',0,'fMax',0,'ganancia',1,'observ','');
         if isfield(d,'entidad'), ent = d.entidad; end
         for mi = 1:numel(d.muestras)
             m = d.muestras(mi);
