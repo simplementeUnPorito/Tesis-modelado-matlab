@@ -9,7 +9,11 @@
 
 clc; close all;
 
-DATA_DIR = 'C:\Github\Tesis\Crudos\muestra_20260608_174501';
+data_root = getenv('TESIS_DATA_ROOT');
+if isempty(data_root)
+    data_root = fullfile(fileparts(fileparts(mfilename('fullpath'))), 'data');
+end
+DATA_DIR = fullfile(data_root, 'raw', 'muestra_20260608_174501');
 LF       = 50;
 NH       = 5;
 HW       = 2;

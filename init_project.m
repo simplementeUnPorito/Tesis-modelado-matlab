@@ -1,8 +1,8 @@
 function project_root = init_project()
-%INIT_PROJECT Configura el path del proyecto Tesis para MATLAB.
+%INIT_PROJECT Configura el path del repositorio de modelado de Tesis.
 %
 % Agrega al path:
-%   - src/matlab
+%   - la raiz de este repositorio
 %   - third-party/MASW-Matlab-code
 %
 % Devuelve:
@@ -12,11 +12,9 @@ function project_root = init_project()
     this_file = mfilename('fullpath');
     this_dir  = fileparts(this_file);
 
-    % this_dir = .../Tesis/src/matlab
-    % subir dos niveles hasta .../Tesis
-    project_root = fileparts(fileparts(this_dir));
-
-    matlab_src = fullfile(project_root, 'src', 'matlab');
+    % Este archivo vive en la raiz del repositorio independiente.
+    project_root = this_dir;
+    matlab_src = this_dir;
     masw_path  = fullfile(project_root, 'third-party', 'MASW-Matlab-code');
 
     % Verificaciones mínimas

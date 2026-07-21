@@ -25,7 +25,7 @@
 %   Disponible en third-party/MASW-Matlab-code/, incluida por init_project().
 %
 % CÓMO CORRER
-%   >> init_project()         % desde src/matlab/
+%   >> init_project()         % desde modelado/matlab/
 %   >> p02_rayleigh_love      % funciona desde cualquier carpeta
 %
 % REFERENCIA PRINCIPAL

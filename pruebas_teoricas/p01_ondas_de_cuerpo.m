@@ -33,7 +33,7 @@
 %
 % CÓMO CORRER
 %   Desde la raíz del proyecto (Tesis/) en MATLAB:
-%     >> cd src/matlab
+%     >> cd modelado/matlab
 %     >> init_project()
 %     >> cd pruebas_teoricas
 %     >> p01_ondas_de_cuerpo

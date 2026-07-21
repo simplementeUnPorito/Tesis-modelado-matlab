@@ -6,3 +6,7 @@
 slprj/
 codegen/
 *_cache.mat
+*.autosave
+*.m~
+*.log
+.vscode/

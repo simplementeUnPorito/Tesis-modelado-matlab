@@ -1,6 +1,6 @@
 # Análisis de la cadena analógica
 
-Este directorio procesa exclusivamente las capturas nuevas cuyo nombre contiene `to` dentro de `Crudos/Osciloscopio`.
+Este directorio procesa exclusivamente las capturas nuevas cuyo nombre contiene `to` dentro de `data/raw/Osciloscopio`.
 
 ## Procesamiento
 
@@ -60,7 +60,7 @@ Cada gráfica de identificación incluye la envolvente mínima-máxima de 4000 r
 ## Ejecución
 
 ```matlab
-cd('C:/Github/Tesis/src/matlab/AnalisisCircuito')
+cd('C:/Github/Tesis/modelado/matlab/AnalisisCircuito')
 results = analizar_sweeps_circuito;
 ```
 

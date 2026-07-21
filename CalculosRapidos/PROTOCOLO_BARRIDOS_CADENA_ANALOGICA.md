@@ -63,7 +63,7 @@ Antes de medir el circuito, conectar las cuatro puntas al mismo seno del generad
 ## Ejecución en MATLAB
 
 ```matlab
-cd('C:/Github/Tesis/src/matlab/CalculosRapidos')
+cd('C:/Github/Tesis/modelado/matlab/CalculosRapidos')
 results = analizar_barridos_cadena_analogica;
 ```
 

@@ -1,0 +1,3 @@
+[submodule "third-party/MASW-Matlab-code"]
+	path = third-party/MASW-Matlab-code
+	url = https://github.com/nikhil2211/MASW-Matlab-code.git

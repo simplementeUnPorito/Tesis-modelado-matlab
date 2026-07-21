@@ -6,7 +6,7 @@ App de App Designer programática (`uifigure`) para controlar y visualizar la re
 ## Ejecutar
 
 ```matlab
-cd src/matlab/InterfazESP
+cd modelado/matlab/InterfazESP
 InterfaceESP        % abre la GUI
 ```
 
