@@ -1,3 +1,4 @@
+*.mat filter=lfs diff=lfs merge=lfs -text
 /SM-24/AnalogOut.mat filter=lfs diff=lfs merge=lfs -text
 /SM-24/Input.mat filter=lfs diff=lfs merge=lfs -text
 /SM-24/NoisyIn.mat filter=lfs diff=lfs merge=lfs -text
