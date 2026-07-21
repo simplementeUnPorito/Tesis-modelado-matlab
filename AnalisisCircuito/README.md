@@ -28,7 +28,7 @@ CH3/PGA = (-27k/7.5k)
           * 1/(1 + s*27k*15n)
 ```
 
-`zeta0=0.25`; `w0` y `zeta1` se calculan del denominador nominal del BP. La ganancia DC es `-3.6 V/V` y el polo antialias es `392.975 Hz`. Con los valores declarados del BP se obtiene `zeta1=980.027`. La combinación actualmente instalada `Ru=7.5 kOhm`, `Rbp=8.2 kOhm` realiza analíticamente `zeta=83.661`, mientras que para realizar `zeta0=0.25` se necesitaría `Rbp≈7.502 kOhm`. `parametros_compensador.csv` deja registrados estos cálculos.
+`zeta0=0.25`; `w0` y `zeta1` se calculan del denominador nominal corregido del BP: `Rin=43 kOhm`, `Rf=47 kOhm`, `Cin=680 uF` y `Cf=177 pF`. La ganancia DC es `-3.6 V/V` y el polo antialias es `392.975 Hz`. Con esos valores se obtiene `zeta1=937.396`. La combinación `Ru=7.5 kOhm`, `Rbp≈8.2 kOhm` realiza analíticamente `zeta≈0.266`; el valor exacto para `zeta0=0.25` es `Rbp≈8199.86 Ohm`. `Rbp` representa el conjunto de `7.5 kOhm` más el reóstato calibrado, no una resistencia fija. `parametros_compensador.csv` deja registrados estos cálculos.
 
 El slew rate de 4.3 V/us —y la referencia mínima de datasheet de 3 V/us— se trata como límite no lineal de amplitud senoidal, no como un polo de una TF lineal. `preprocesamiento.csv` registra un margen conservador por canal y `limite_slew_rate.csv` tabula la amplitud máxima frente a frecuencia. El ruido típico de entrada de 45 nV/sqrt(Hz) y el offset máximo de 3 mV se documentan, pero no se agrega ruido sintético a los datos medidos.
 
@@ -87,4 +87,4 @@ El programa guarda una caché en `resultados/00_cache/analisis_circuito.mat`. La
 
 Las figuras se muestran durante la ejecución, permanecen abiertas en MATLAB para usar zoom y cursores, y se guardan simultáneamente como `.fig` y `.png`.
 
-Las nueve bandas esperadas, incluida `20kHzto200kHz_1ms_100us_div`, están presentes. Si el informe indica `Bandas faltantes: ninguna`, no hace falta repetir mediciones por cobertura.
+Después de cargar la nueva campaña, el informe debe indicar `Bandas faltantes: ninguna`; de lo contrario se repiten únicamente las bandas listadas.

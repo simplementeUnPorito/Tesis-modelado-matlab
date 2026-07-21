@@ -752,7 +752,7 @@ model=tfest(data,order(1),order(2),options);
 end
 
 function ideal = idealModels(cfg)
-RinBp=43e3;RfBp=43e3;CinBp=680e-6;CfBp=177e-12;
+RinBp=43e3;RfBp=47e3;CinBp=680e-6;CfBp=177e-12;
 RsumFeedback=27e3;Csum=15e-9;
 R1=30e3;R2=150e3;R3=12e3;C1=47e-9;C2=3.3e-9;
 Ru=7.5e3;Rbp=8.2e3;wpU=1/Ru;wpBp=1/Rbp;
@@ -1028,7 +1028,7 @@ monteCarlo.sampleCount=n;monteCarlo.seed=cfg.monteCarloSeed;
 monteCarlo.opamp=cfg.opamp;
 monteCarlo.frequencyChunkSize=cfg.monteCarloFrequencyChunkSize;
 monteCarlo.RinBp=sampleComponent(43e3,n,t.resistorMinus,t.resistorPlus);
-monteCarlo.RfBp=sampleComponent(43e3,n,t.resistorMinus,t.resistorPlus);
+monteCarlo.RfBp=sampleComponent(47e3,n,t.resistorMinus,t.resistorPlus);
 monteCarlo.CinBp=sampleComponent(680e-6,n,t.electrolyticMinus,t.electrolyticPlus);
 monteCarlo.CfBp150=sampleComponent(150e-12,n,t.ceramicMinus,t.ceramicPlus);
 monteCarlo.CfBp27=sampleComponent(27e-12,n,t.ceramicMinus,t.ceramicPlus);
