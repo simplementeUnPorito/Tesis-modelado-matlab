@@ -1,0 +1,23 @@
+Identificación de la cadena analógica
+Datos: C:\Github\Tesis\Crudos\Osciloscopio
+
+===== BP =====
+Numerador:   [0 -42648.6554 -8968.624135]
+Denominador: [1 39693.30639 10241.79513]
+Polos (rad/s):
+  -39693.0484 +0j
+  -0.258024907 +0j
+
+===== SUM =====
+Numerador:   [0 -8128028.697]
+Denominador: [1 839.1933406]
+Polos (rad/s):
+  -839.193341 +0j
+
+===== LP =====
+Numerador:   [0 0 -16326057.76]
+Denominador: [1 2584.869748 3334426.598]
+Polos (rad/s):
+  -1292.43487 +1289.97624j
+  -1292.43487 -1289.97624j
+
