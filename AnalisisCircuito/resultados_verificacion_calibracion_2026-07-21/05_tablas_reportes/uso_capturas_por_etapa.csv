@@ -1,0 +1,53 @@
+Band,Capture,Stage,Used,ExclusionReason
+10Hzto100Hz_2s_250ms_div,ALL0002_F0002,BP,1,usada
+10Hzto100Hz_2s_250ms_div,ALL0002_F0002,COMP,1,usada
+10Hzto100Hz_2s_250ms_div,ALL0002_F0002,LP,1,usada
+10Hzto100Hz_2s_250ms_div,ALL0002_F0002,LP_PGA,1,usada
+10Hzto100Hz_2s_250ms_div,ALL0003_F0003,BP,1,usada
+10Hzto100Hz_2s_250ms_div,ALL0003_F0003,COMP,1,usada
+10Hzto100Hz_2s_250ms_div,ALL0003_F0003,LP,1,usada
+10Hzto100Hz_2s_250ms_div,ALL0003_F0003,LP_PGA,1,usada
+10Hzto100Hz_2s_250ms_div,ALL0004_F0004,BP,1,usada
+10Hzto100Hz_2s_250ms_div,ALL0004_F0004,COMP,1,usada
+10Hzto100Hz_2s_250ms_div,ALL0004_F0004,LP,1,usada
+10Hzto100Hz_2s_250ms_div,ALL0004_F0004,LP_PGA,1,usada
+10Hzto100Hz_2s_250ms_div,ALL0005_F0005,BP,1,usada con entrada recortada CH1; validar coherencia
+10Hzto100Hz_2s_250ms_div,ALL0005_F0005,COMP,0,descartada por saturación de CH1
+10Hzto100Hz_2s_250ms_div,ALL0005_F0005,LP,1,usada
+10Hzto100Hz_2s_250ms_div,ALL0005_F0005,LP_PGA,0,descartada por saturación de CH1
+100Hzto1kHz_200ms_25ms_div,ALL0006_F0006,BP,1,usada
+100Hzto1kHz_200ms_25ms_div,ALL0006_F0006,COMP,1,usada
+100Hzto1kHz_200ms_25ms_div,ALL0006_F0006,LP,1,usada
+100Hzto1kHz_200ms_25ms_div,ALL0006_F0006,LP_PGA,1,usada
+100Hzto1kHz_200ms_25ms_div,ALL0007_F0007,BP,1,usada
+100Hzto1kHz_200ms_25ms_div,ALL0007_F0007,COMP,1,usada
+100Hzto1kHz_200ms_25ms_div,ALL0007_F0007,LP,1,usada
+100Hzto1kHz_200ms_25ms_div,ALL0007_F0007,LP_PGA,1,usada
+250Hzto2.5kHz_80ms_10ms_div,ALL0005_F0005,BP,0,descartada por saturación de CH2
+250Hzto2.5kHz_80ms_10ms_div,ALL0005_F0005,COMP,0,descartada por saturación de CH2
+250Hzto2.5kHz_80ms_10ms_div,ALL0005_F0005,LP,1,usada
+250Hzto2.5kHz_80ms_10ms_div,ALL0005_F0005,LP_PGA,0,descartada por saturación de CH2
+250Hzto2.5kHz_80ms_10ms_div,ALL0006_F0006,BP,0,descartada por saturación de CH2
+250Hzto2.5kHz_80ms_10ms_div,ALL0006_F0006,COMP,0,descartada por saturación de CH2
+250Hzto2.5kHz_80ms_10ms_div,ALL0006_F0006,LP,1,usada
+250Hzto2.5kHz_80ms_10ms_div,ALL0006_F0006,LP_PGA,0,descartada por saturación de CH2
+1kHzto10kHz_20ms_2.5ms_div,ALL0003_F0003,BP,0,descartada por saturación de CH2
+1kHzto10kHz_20ms_2.5ms_div,ALL0003_F0003,COMP,0,descartada por saturación de CH2
+1kHzto10kHz_20ms_2.5ms_div,ALL0003_F0003,LP,1,usada
+1kHzto10kHz_20ms_2.5ms_div,ALL0003_F0003,LP_PGA,0,descartada por saturación de CH2
+1kHzto10kHz_20ms_2.5ms_div,ALL0004_F0004,BP,1,usada
+1kHzto10kHz_20ms_2.5ms_div,ALL0004_F0004,COMP,1,usada
+1kHzto10kHz_20ms_2.5ms_div,ALL0004_F0004,LP,1,usada
+1kHzto10kHz_20ms_2.5ms_div,ALL0004_F0004,LP_PGA,1,usada
+5kHzto50kHz_4ms_500us_div,ALL0001_F0001,BP,0,descartada por saturación de CH2
+5kHzto50kHz_4ms_500us_div,ALL0001_F0001,COMP,0,descartada por saturación de CH2
+5kHzto50kHz_4ms_500us_div,ALL0001_F0001,LP,1,usada
+5kHzto50kHz_4ms_500us_div,ALL0001_F0001,LP_PGA,0,descartada por saturación de CH2
+5kHzto50kHz_4ms_500us_div,ALL0002_F0002,BP,1,usada
+5kHzto50kHz_4ms_500us_div,ALL0002_F0002,COMP,1,usada
+5kHzto50kHz_4ms_500us_div,ALL0002_F0002,LP,1,usada
+5kHzto50kHz_4ms_500us_div,ALL0002_F0002,LP_PGA,1,usada
+20kHzto200kHz_1ms_100us_div,ALL0000_F0000,BP,1,usada
+20kHzto200kHz_1ms_100us_div,ALL0000_F0000,COMP,1,usada
+20kHzto200kHz_1ms_100us_div,ALL0000_F0000,LP,1,usada
+20kHzto200kHz_1ms_100us_div,ALL0000_F0000,LP_PGA,1,usada

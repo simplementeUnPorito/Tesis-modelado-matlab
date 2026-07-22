@@ -1,13 +1,15 @@
-function results = analizar_sweeps_circuito(dataRoot, outputRoot, showFigures)
+function results = analizar_sweeps_circuito(dataRoot, outputRoot, showFigures, fixedStageDataRoots)
 %ANALIZAR_SWEEPS_CIRCUITO Identificación de BP, compensador, LP y cadena completa.
 %
 % CH1=PGA, CH2=BP, CH3=compensador y CH4=LP.
 % Se conserva la escala registrada por el osciloscopio, sin conversión ×2.
+% fixedStageDataRoots puede contener campañas históricas que aportan sólo a
+% BP y LP. COMP y las cadenas completas usan exclusivamente dataRoot.
 
 scriptDir = fileparts(mfilename('fullpath'));
 projectRoot = fileparts(fileparts(fileparts(scriptDir)));
 if nargin < 1 || isempty(dataRoot) || strlength(string(dataRoot)) == 0
-    dataRoot = fullfile(projectRoot,'Crudos','Osciloscopio');
+    dataRoot = fullfile(projectRoot,'data','raw','Osciloscopio');
 end
 if nargin < 2 || isempty(outputRoot) || strlength(string(outputRoot)) == 0
     outputRoot = fullfile(scriptDir,'resultados');
@@ -25,7 +27,29 @@ cfg.saturationOverrideFile = fullfile(scriptDir,'saturation_overrides.csv');
 if nargin >= 3 && ~isempty(showFigures)
     cfg.showFigures = logical(showFigures);
 end
-captures = discoverCaptures(dataRoot);
+if nargin<4 || isempty(fixedStageDataRoots)
+    fixedStageDataRoots={};
+end
+fixedStageDataRoots=cellstr(string(fixedStageDataRoots));
+normalizedFixedRoots=cell(size(fixedStageDataRoots));
+for k=1:numel(fixedStageDataRoots)
+    assert(isfolder(fixedStageDataRoots{k}),'No existe %s.',fixedStageDataRoots{k});
+    normalizedFixedRoots{k}=normalizeExistingPath(fixedStageDataRoots{k});
+end
+normalizedFixedRoots=unique(normalizedFixedRoots,'stable');
+normalizedFixedRoots=normalizedFixedRoots(~strcmpi(normalizedFixedRoots,dataRoot));
+cfg.fixedStageDataRoots=normalizedFixedRoots;
+
+captures = discoverCaptures(dataRoot,false,'');
+for k=1:numel(normalizedFixedRoots)
+    [~,sourceTag]=fileparts(normalizedFixedRoots{k});
+    extra=discoverCaptures(normalizedFixedRoots{k},true,sourceTag);
+    captures=[captures;extra]; %#ok<AGROW>
+end
+if ~isempty(captures)
+    [~,order]=sortrows([[captures.fStart].' [captures.fStop].']);
+    captures=captures(order);
+end
 assert(~isempty(captures),'No se encontraron capturas nuevas *to* con cuatro canales.');
 [cacheKey,cacheFile] = analysisCacheKey(captures,cfg,scriptDir,dataRoot,folders.cache);
 if isfile(cacheFile)
@@ -121,7 +145,17 @@ for k = 1:numel(captures)
     processedInputs = stageInputs(processed,cfg);
     rawOutputs = {rawCentered(:,2),rawCentered(:,3),rawCentered(:,4),rawCentered(:,4)};
     processedOutputs = {processed(:,2),processed(:,3),processed(:,4),processed(:,4)};
-    [stageUsable,stageReasons] = captureStageUsability(cap.channelSaturated,stageNames);
+    [stageSegments,stageReasons,stageRetainedFraction] = ...
+        captureStageSegments(cap,stageNames,cfg);
+    stageUsable=~cellfun(@isempty,stageSegments);
+    if captures(k).fixedStagesOnly
+        for restricted=find(~ismember(stageNames,{'BP','LP'}))
+            stageUsable(restricted)=false;
+            stageSegments{restricted}={};
+            stageRetainedFraction(restricted)=0;
+            stageReasons(restricted)="omitida: campaña histórica sólo para BP/LP";
+        end
+    end
 
     for s = 1:numel(stageNames)
         usage = emptyUsageRow();
@@ -130,16 +164,26 @@ for k = 1:numel(captures)
         usage.Stage = string(stageNames{s});
         usage.Used = stageUsable(s);
         usage.ExclusionReason = stageReasons(s);
+        usage.LinearSubsamples = numel(stageSegments{s});
+        usage.RetainedSweepFraction = stageRetainedFraction(s);
         usageRows(end+1,1) = usage; %#ok<AGROW>
         if ~stageUsable(s),continue;end
-        estRaw = estimateKnownSweepFrf(cap.time,rawInputs{s},rawOutputs{s}, ...
-            cap.fStart,cap.fStop,cap.sweepDuration,cfg);
-        estProcessed = estimateKnownSweepFrf(cap.time,processedInputs{s},processedOutputs{s}, ...
-            cap.fStart,cap.fStop,cap.sweepDuration,cfg);
-        estRaw = labelEstimate(estRaw,cap);
-        estProcessed = labelEstimate(estProcessed,cap);
-        rawFrf.(stageNames{s}) = appendEstimate(rawFrf.(stageNames{s}),estRaw);
-        processedFrf.(stageNames{s}) = appendEstimate(processedFrf.(stageNames{s}),estProcessed);
+        for segmentIndex=1:numel(stageSegments{s})
+            segmentMask=stageSegments{s}{segmentIndex};
+            estRaw = estimateKnownSweepFrf(cap.time,rawInputs{s},rawOutputs{s}, ...
+                cap.fStart,cap.fStop,cap.sweepDuration,cfg,segmentMask);
+            estProcessed = estimateKnownSweepFrf(cap.time,processedInputs{s},processedOutputs{s}, ...
+                cap.fStart,cap.fStop,cap.sweepDuration,cfg,segmentMask);
+            segmentCap=cap;
+            if numel(stageSegments{s})>1 || ...
+                    any(cap.channelSaturated(stageDependencyChannels(stageNames{s})))
+                segmentCap.captureId=sprintf('%s_lin%02d',cap.captureId,segmentIndex);
+            end
+            estRaw = labelEstimate(estRaw,segmentCap);
+            estProcessed = labelEstimate(estProcessed,segmentCap);
+            rawFrf.(stageNames{s}) = appendEstimate(rawFrf.(stageNames{s}),estRaw);
+            processedFrf.(stageNames{s}) = appendEstimate(processedFrf.(stageNames{s}),estProcessed);
+        end
     end
     plotPreprocessing(cap,rawCentered,processed,lineInfo,cfg,folders.preprocessing);
 end
@@ -157,13 +201,25 @@ writetable(gainRecommendationTable, ...
     fullfile(folders.tables,'ganancia_medicion_recomendada.csv'));
 
 ideal = idealModels(cfg);
+bpForPotDiagnostic = stitchFrf(processedFrf.BP,cfg);
+compForPotDiagnostic = stitchFrf(processedFrf.COMP,cfg);
+ideal.compensation = estimatePotentiometerSetting( ...
+    bpForPotDiagnostic,compForPotDiagnostic,ideal.compensation,cfg);
 monteCarlo = createMonteCarloSamples(cfg);
 writetable(toleranceTable(cfg),fullfile(folders.tables,'configuracion_tolerancias.csv'));
 writetable(opAmpParameterTable(cfg),fullfile(folders.tables,'modelo_operacional_psoc.csv'));
 writetable(slewRateLimitTable(cfg),fullfile(folders.tables,'limite_slew_rate.csv'));
 writetable(compensationParameterTable(ideal), ...
     fullfile(folders.tables,'parametros_compensador.csv'));
-orders = struct('BP',[2 1],'COMP',[3 2],'LP',[2 0],'LP_PGA',[5 2]);
+% Orden [polos ceros]. Se agregan dos grados por cada operacional que
+% participa en el camino y se conserva el grado relativo nominal. Esto da
+% libertad para representar la dinámica no modelada sin forzar, por
+% ejemplo, una pendiente artificial de orden nueve en PGA -> ADC.
+orders = struct('BP',[4 3],'COMP',[5 4],'LP',[4 2],'LP_PGA',[11 8]);
+nominalOrders = struct('BP',[2 1],'COMP',[3 2],'LP',[2 0],'LP_PGA',[5 2]);
+relatedOpAmps = struct('BP',1,'COMP',1,'LP',1,'LP_PGA',3);
+tfestOrdersTable=tfestOrderTable(orders,nominalOrders,relatedOpAmps);
+writetable(tfestOrdersTable,fullfile(folders.tables,'ordenes_tfest.csv'));
 fitRanges = struct('BP',[0.2 5e4],'COMP',[0.2 5e3], ...
     'LP',[10 1.2e3],'LP_PGA',[0.2 1.2e3]);
 summaryRows = repmat(emptySummaryRow(),0,1);
@@ -194,6 +250,7 @@ for s = 1:numel(stageNames)
     results.fitMasks.(name) = fitMask;
     plotStage(name,rawStitched,stitched,model,ideal,monteCarlo,cfg, ...
         stageOutputFolder(name,folders));
+    plotNormalizedStage(name,rawStitched,stitched,model,ideal,cfg,folders.normalized);
 end
 
 % Respuesta compuesta con el geófono nominal. No constituye una quinta
@@ -203,12 +260,13 @@ processedGeo = multiplyFrf(results.frfProcessed.LP_PGA,ideal.GEOPHONE);
 geoModel = minreal(results.models.LP_PGA*ideal.GEOPHONE,1e-7);
 geoMask = results.fitMasks.LP_PGA;
 summaryRows(end+1,1) = stageMetrics('GEO_LP',processedGeo,rawGeo, ...
-    geoMask,geoModel,ideal,monteCarlo); %#ok<AGROW>
+    geoMask,geoModel,ideal,monteCarlo);
 results.frfRaw.GEO_LP = rawGeo;
 results.frfProcessed.GEO_LP = processedGeo;
 results.models.GEO_LP = geoModel;
 results.fitMasks.GEO_LP = geoMask;
 plotStage('GEO_LP',rawGeo,processedGeo,geoModel,ideal,monteCarlo,cfg,folders.chainGeo);
+plotNormalizedStage('GEO_LP',rawGeo,processedGeo,geoModel,ideal,cfg,folders.normalized);
 results.chains.PGA_to_ADC.measuredRaw=results.frfRaw.LP_PGA;
 results.chains.PGA_to_ADC.measuredProcessed=results.frfProcessed.LP_PGA;
 results.chains.PGA_to_ADC.tfest=results.models.LP_PGA;
@@ -229,15 +287,17 @@ results.processing = processingTable;
 results.saturation = saturationTable;
 results.captureUse = usageTable;
 results.gainRecommendations = gainRecommendationTable;
+results.tfestOrders = tfestOrdersTable;
 results.summary = struct2table(summaryRows);
 results.config = cfg;
 results.dataRoot = dataRoot;
+results.fixedStageDataRoots = normalizedFixedRoots;
 results.outputRoot = outputRoot;
 results.outputFolders = folders;
 results.missingExpectedBands = missingExpected;
 results.unexpectedBands = unexpected;
 results.cacheKey = cacheKey;
-results.cacheVersion = 5;
+results.cacheVersion = 8;
 
 writetable(results.summary,fullfile(folders.tables,'resumen_identificacion.csv'));
 writeReport(results,fullfile(folders.tables,'informe_identificacion.txt'));
@@ -260,8 +320,10 @@ cfg.opamp.DataSheetMinimumGainBandwidthHz = 3e6;
 cfg.opamp.DataSheetMinimumSlewRateVPerS = 3e6;
 cfg.opamp.InputNoiseDensityVPerSqrtHz = 45e-9;
 cfg.opamp.InputOffsetMaxV = 3e-3;
-cfg.WP_U = 1/7.5e3;
-cfg.WP_BP = 1/8.2e3;
+cfg.components.RuOhm = 6.8e3;
+cfg.components.RbpFixedOhm = 6.8e3;
+cfg.components.RbpPotMaximumOhm = 2e3;
+cfg.components.CompensationZeta0 = 0.25;
 cfg.bandpassEnabled = true;
 cfg.bandpassOrder = 4;
 cfg.bandpassLowFactor = 0.5;
@@ -290,16 +352,22 @@ cfg.saturation.absoluteVoltageThresholdV = 2.3;
 cfg.saturation.minimumSamples = 1;
 cfg.saturation.activeEdgeFraction = 0.05;
 cfg.saturation.recommendedTargetV = 2.0;
+cfg.saturation.exclusionCycles = 1.0;
+cfg.saturation.minimumLinearSegmentSamples = 32;
+cfg.saturation.minimumLinearSegmentCycles = 2;
+cfg.saturation.minimumLinearFrequencyRatio = 1.03;
 cfg.monteCarloSamples = 4000;
 cfg.monteCarloSeed = 2909;
 cfg.monteCarloFrequencyChunkSize = 48;
+cfg.potentiometerEnvelopeSteps = 41;
 cfg.tolerance.resistorMinus = 0.01;
 cfg.tolerance.resistorPlus = 0.01;
 cfg.tolerance.ceramicMinus = 0.20;
 cfg.tolerance.ceramicPlus = 0.20;
 cfg.tolerance.electrolyticMinus = 0.40;
 cfg.tolerance.electrolyticPlus = 0.10;
-cfg.expectedBands = [0.1 1;0.5 5;2.5 25;10 100;50 500;250 2500;1e3 1e4;5e3 5e4;2e4 2e5];
+cfg.expectedBands = [0.01 0.05;0.025 0.25;0.1 1;0.5 5;2.5 25;10 100; ...
+    50 500;250 2500;1e3 1e4;5e3 5e4;2e4 2e5];
 end
 
 function folders=prepareResultFolders(outputRoot)
@@ -314,6 +382,7 @@ folders.chainRoot=fullfile(outputRoot,'04_cadena_adc');
 folders.chainPga=fullfile(folders.chainRoot,'PGA_a_ADC');
 folders.chainGeo=fullfile(folders.chainRoot,'GEO_a_ADC');
 folders.tables=fullfile(outputRoot,'05_tablas_reportes');
+folders.normalized=fullfile(outputRoot,'06_graficos_normalizados');
 names=fieldnames(folders);
 for k=1:numel(names)
     folder=folders.(names{k});
@@ -335,7 +404,7 @@ function [key,cacheFile]=analysisCacheKey(captures,cfg,scriptDir,dataRoot,cacheF
 cacheFile=fullfile(cacheFolder,'analisis_circuito.mat');
 digest=java.security.MessageDigest.getInstance('SHA-256');
 cacheConfig=rmfield(cfg,'showFigures');
-updateDigest(digest,['cache-v5|' char(dataRoot) '|' jsonencode(cacheConfig)]);
+updateDigest(digest,['cache-v7|' char(dataRoot) '|' jsonencode(cacheConfig)]);
 dependencies={fullfile(scriptDir,'analizar_sweeps_circuito.m'), ...
     fullfile(scriptDir,'cancelar_armonicos_linea_ls.m')};
 if isfile(cfg.saturationOverrideFile)
@@ -376,7 +445,7 @@ end
 function clearGeneratedArtifacts(folders)
 targets={folders.oscilloscope,folders.preprocessing,folders.bp,folders.comp, ...
     folders.lp,folders.chainPga,folders.chainGeo,folders.tables, ...
-    fullfile(folders.identificationRoot,'SUM')};
+    folders.normalized,fullfile(folders.identificationRoot,'SUM')};
 patterns={'*.fig','*.png','*.csv','*.txt'};
 for t=1:numel(targets)
     if ~isfolder(targets{t}),continue;end
@@ -398,13 +467,19 @@ tableFiles={'resumen_identificacion.csv','preprocesamiento.csv','salud_capturas.
     'configuracion_tolerancias.csv','modelo_operacional_psoc.csv', ...
     'limite_slew_rate.csv','informe_identificacion.txt', ...
     'saturacion_canales.csv','uso_capturas_por_etapa.csv', ...
-    'ganancia_medicion_recomendada.csv','parametros_compensador.csv'};
+    'ganancia_medicion_recomendada.csv','parametros_compensador.csv', ...
+    'ordenes_tfest.csv'};
 tablesPresent=all(cellfun(@(name)isfile(fullfile(folders.tables,name)),tableFiles));
 plotsPresent=plotPairExists(folders.bp,'identificacion_bp') && ...
     plotPairExists(folders.comp,'compensador_pga') && ...
     plotPairExists(folders.lp,'identificacion_lp') && ...
     plotPairExists(folders.chainPga,'cadena_pga_adc') && ...
-    plotPairExists(folders.chainGeo,'cadena_geo_adc');
+    plotPairExists(folders.chainGeo,'cadena_geo_adc') && ...
+    plotPairExists(folders.normalized,'normalizado_identificacion_bp') && ...
+    plotPairExists(folders.normalized,'normalizado_compensador_pga') && ...
+    plotPairExists(folders.normalized,'normalizado_identificacion_lp') && ...
+    plotPairExists(folders.normalized,'normalizado_cadena_pga_adc') && ...
+    plotPairExists(folders.normalized,'normalizado_cadena_geo_adc');
 present=tablesPresent && plotsPresent && ...
     numel(dir(fullfile(folders.oscilloscope,'*.fig')))==numel(captures) && ...
     numel(dir(fullfile(folders.preprocessing,'*.fig')))==numel(captures);
@@ -423,11 +498,14 @@ for k=1:numel(files),openfig(fullfile(files(k).folder,files(k).name),'new','visi
 drawnow;
 end
 
-function captures = discoverCaptures(dataRoot)
+function captures = discoverCaptures(dataRoot,fixedStagesOnly,sourceTag)
+if nargin<2,fixedStagesOnly=false;end
+if nargin<3,sourceTag='';end
 bandFolders = dir(fullfile(dataRoot,'*to*'));
 bandFolders = bandFolders([bandFolders.isdir]);
 captures = repmat(struct('band','', 'folder','', 'captureId','', 'files',{{}}, ...
-    'fStart',NaN,'fStop',NaN,'sweepDuration',NaN),0,1);
+    'fStart',NaN,'fStop',NaN,'sweepDuration',NaN, ...
+    'fixedStagesOnly',false,'sourceRoot',''),0,1);
 for b = 1:numel(bandFolders)
     [fStart,fStop,sweepDuration] = parseBandFolder(bandFolders(b).name);
     if ~all(isfinite([fStart fStop sweepDuration])), continue; end
@@ -439,6 +517,10 @@ for b = 1:numel(bandFolders)
             '^[\\/]+|[\\/]+$','');
         if isempty(relativeFolder),relativeFolder='root';end
         captureId=regexprep(sprintf('%s_%s',relativeFolder,filePrefix),'[\\/]+','_');
+        if strlength(string(sourceTag))>0
+            captureId=regexprep(sprintf('%s_%s',sourceTag,captureId), ...
+                '[^a-zA-Z0-9._-]','_');
+        end
         files = cell(1,4);
         complete = true;
         for channel = 1:4
@@ -451,7 +533,8 @@ for b = 1:numel(bandFolders)
         end
         row = struct('band',bandFolders(b).name,'folder',ch1(k).folder, ...
             'captureId',captureId,'files',{files},'fStart',fStart, ...
-            'fStop',fStop,'sweepDuration',sweepDuration);
+            'fStop',fStop,'sweepDuration',sweepDuration, ...
+            'fixedStagesOnly',logical(fixedStagesOnly),'sourceRoot',dataRoot);
         captures(end+1,1) = row; %#ok<AGROW>
     end
 end
@@ -510,6 +593,7 @@ signals = signals(idx,:);
 dt = median(diff(time));
 fs=1/dt;
 channelSaturated=false(1,4);
+channelSaturationMasks=false(numel(time),4);
 saturationRows=repmat(emptySaturationRow(),0,1);
 saturationAny=false(size(time));
 for channel=1:4
@@ -517,8 +601,18 @@ for channel=1:4
         info.sweepDuration,cfg.saturation);
     [diagnostic.FinalSaturated,diagnostic.DecisionSource,diagnostic.Reason]= ...
         applySaturationOverride(diagnostic,overrides,info.band,info.captureId,channel);
+    if ~diagnostic.FinalSaturated
+        diagnostic.SaturationMask(:)=false;
+    elseif ~any(diagnostic.SaturationMask)
+        forcedActive=time>=cfg.saturation.activeEdgeFraction*info.sweepDuration & ...
+            time<=(1-cfg.saturation.activeEdgeFraction)*info.sweepDuration;
+        diagnostic.SaturationMask(forcedActive)=true;
+    end
     channelSaturated(channel)=diagnostic.FinalSaturated;
     saturationAny=saturationAny|diagnostic.SaturationMask;
+    channelSaturationMasks(:,channel)=expandSaturationMask( ...
+        diagnostic.SaturationMask,time,info.fStart,info.fStop, ...
+        info.sweepDuration,cfg.saturation.exclusionCycles);
     saturationRow=emptySaturationRow();
     saturationRow.Band=string(info.band);
     saturationRow.Capture=string(info.captureId);
@@ -558,7 +652,20 @@ end
 cap = struct('band',info.band,'captureId',info.captureId,'fStart',info.fStart, ...
     'fStop',info.fStop,'sweepDuration',info.sweepDuration,'time',time, ...
     'signals',signals,'fs',fs,'health',row,'channelSaturated',channelSaturated, ...
+    'channelSaturationMasks',channelSaturationMasks, ...
     'saturationRows',saturationRows);
+end
+
+function expanded=expandSaturationMask(mask,time,fStart,fStop,duration,cycles)
+expanded=false(size(mask));
+runs=logicalRuns(mask(:));
+for k=1:size(runs,1)
+    runTime=time(runs(k,:));
+    center=max(0,min(duration,mean(runTime)));
+    localFrequency=fStart*(fStop/fStart)^(center/duration);
+    margin=cycles/max(eps,localFrequency);
+    expanded=expanded | (time>=runTime(1)-margin & time<=runTime(2)+margin);
+end
 end
 
 function overrides=readSaturationOverrides(filename)
@@ -661,29 +768,69 @@ function inputs = stageInputs(signals,~)
 inputs = {signals(:,1),signals(:,1),signals(:,3),signals(:,1)};
 end
 
-function [usable,reasons]=captureStageUsability(channelSaturated,stageNames)
-dependencies=struct('BP',[1 2],'COMP',[1 2 3],'LP',[1 2 3 4], ...
-    'LP_PGA',[1 2 3 4]);
-usable=false(1,numel(stageNames));reasons=strings(1,numel(stageNames));
+function channels=stageDependencyChannels(stageName)
+dependencies=struct('BP',2,'COMP',[1 2 3],'LP',4,'LP_PGA',[1 2 3 4]);
+channels=dependencies.(stageName);
+end
+
+function [segments,reasons,retainedFraction]=captureStageSegments(cap,stageNames,cfg)
+% Cada transferencia conserva los intervalos lineales que le corresponden.
+% BP y LP locales sólo exigen que su salida no recorte; COMP y la cadena
+% PGA->ADC excluyen el recorte de cualquier canal interno participante.
+active=cap.time>=cfg.edgeFraction*cap.sweepDuration & ...
+    cap.time<=(1-cfg.edgeFraction)*cap.sweepDuration;
+frequency=NaN(size(cap.time));
+frequency(active)=cap.fStart*(cap.fStop/cap.fStart).^( ...
+    cap.time(active)/cap.sweepDuration);
+segments=cell(1,numel(stageNames));
+reasons=strings(1,numel(stageNames));
+retainedFraction=zeros(1,numel(stageNames));
 for k=1:numel(stageNames)
-    required=dependencies.(stageNames{k});
-    saturated=required(channelSaturated(required));
-    usable(k)=isempty(saturated);
-    if usable(k)
-        reasons(k)="usada";
+    channels=stageDependencyChannels(stageNames{k});
+    unsafe=any(cap.channelSaturationMasks(:,channels),2);
+    safe=active & ~unsafe;
+    retainedFraction(k)=nnz(safe)/max(1,nnz(active));
+    runs=logicalRuns(safe);
+    accepted=cell(0,1);
+    for r=1:size(runs,1)
+        index=(runs(r,1):runs(r,2)).';
+        if numel(index)<cfg.saturation.minimumLinearSegmentSamples,continue;end
+        segmentCycles=sum(frequency(index))/cap.fs;
+        segmentRatio=max(frequency(index))/min(frequency(index));
+        if segmentCycles<cfg.saturation.minimumLinearSegmentCycles || ...
+                segmentRatio<cfg.saturation.minimumLinearFrequencyRatio
+            continue;
+        end
+        mask=false(size(cap.time));mask(index)=true;
+        accepted{end+1,1}=mask; %#ok<AGROW>
+    end
+    segments{k}=accepted;
+    saturatedChannels=channels(cap.channelSaturated(channels));
+    if isempty(accepted)
+        if isempty(saturatedChannels)
+            reasons(k)="descartada: sin intervalo espectral suficiente";
+        else
+            reasons(k)="descartada: saturación de "+join("CH"+saturatedChannels,',')+ ...
+                " sin tramo lineal suficiente";
+        end
+    elseif isempty(saturatedChannels)
+        reasons(k)="usada completa";
     else
-        reasons(k)="descartada por saturación de "+join("CH"+saturated,',');
+        reasons(k)=sprintf('usada parcialmente: %d submuestra(s), %.1f%% del sweep lineal; saturación %s', ...
+            numel(accepted),100*retainedFraction(k), ...
+            char(join("CH"+saturatedChannels,',')));
     end
 end
 end
 
-function est = estimateKnownSweepFrf(time,inputSignal,outputSignal,fStart,fStop,sweepDuration,cfg)
+function est = estimateKnownSweepFrf(time,inputSignal,outputSignal,fStart,fStop,sweepDuration,cfg,validMask)
+if nargin<8 || isempty(validMask),validMask=true(size(time));end
 u = inputSignal(:)-mean(inputSignal);
 y = outputSignal(:)-mean(outputSignal);
 ua = hilbert(u);
 ya = hilbert(y);
 active = time >= cfg.edgeFraction*sweepDuration & ...
-    time <= (1-cfg.edgeFraction)*sweepDuration;
+    time <= (1-cfg.edgeFraction)*sweepDuration & validMask(:);
 frequency = NaN(size(time));
 frequency(active) = fStart*(fStop/fStart).^(time(active)/sweepDuration);
 logProgress = NaN(size(time));
@@ -751,72 +898,72 @@ options=tfestOptions('Display','off'); options.EnforceStability=true;
 model=tfest(data,order(1),order(2),options);
 end
 
+function tableOut=tfestOrderTable(orders,nominalOrders,relatedOpAmps)
+names=fieldnames(orders);n=numel(names);
+Stage=strings(n,1);NominalPoles=zeros(n,1);NominalZeros=zeros(n,1);
+RelatedOpAmps=zeros(n,1);AddedDegreesPerOpAmp=2*ones(n,1);
+TfestPoles=zeros(n,1);TfestZeros=zeros(n,1);
+for k=1:n
+    name=names{k};Stage(k)=name;
+    NominalPoles(k)=nominalOrders.(name)(1);
+    NominalZeros(k)=nominalOrders.(name)(2);
+    RelatedOpAmps(k)=relatedOpAmps.(name);
+    TfestPoles(k)=orders.(name)(1);
+    TfestZeros(k)=orders.(name)(2);
+end
+tableOut=table(Stage,NominalPoles,NominalZeros,RelatedOpAmps, ...
+    AddedDegreesPerOpAmp,TfestPoles,TfestZeros);
+end
+
 function ideal = idealModels(cfg)
 RinBp=43e3;RfBp=47e3;CinBp=680e-6;CfBp=177e-12;
 RsumFeedback=27e3;Csum=15e-9;
 R1=30e3;R2=150e3;R3=12e3;C1=47e-9;C2=3.3e-9;
-Ru=7.5e3;Rbp=8.2e3;wpU=1/Ru;wpBp=1/Rbp;
-
-% Referencias antiguas con amplificador operacional matemáticamente ideal.
-ideal.BP_OPAMP_IDEAL=makeBp(RinBp,RfBp,CinBp,CfBp);
-ideal.SUM_OPAMP_IDEAL=tf(-RsumFeedback,[RsumFeedback*Csum 1]);
-ideal.LP_OPAMP_IDEAL=tf(-(R2/R1), ...
-    [R2*R3*C1*C2,C2*(R2+R3+R2*R3/R1),1]);
+Ru=cfg.components.RuOhm;
+RbpFixed=cfg.components.RbpFixedOhm;
+RbpPotMaximum=cfg.components.RbpPotMaximumOhm;
 bpA2=RinBp*RfBp*CinBp*CfBp;
 bpA1=RinBp*CinBp+RfBp*CfBp;
 compensationW0=sqrt(1/bpA2);
 compensationZeta1=bpA1/(2*sqrt(bpA2));
-compensationZeta0=0.25;
+compensationZeta0=cfg.components.CompensationZeta0;
+bpNumeratorCoefficient=RfBp*CinBp/bpA2;
+requiredRbp=Ru*bpNumeratorCoefficient/ ...
+    (2*compensationW0*(compensationZeta1-compensationZeta0));
+nullRbp=Ru*bpNumeratorCoefficient/(2*compensationW0*compensationZeta1);
+assert(requiredRbp>=RbpFixed && requiredRbp<=RbpFixed+RbpPotMaximum, ...
+    'El ajuste Rbp requerido (%.6g ohm) queda fuera del potenciómetro.',requiredRbp);
+Rbp=requiredRbp;wpU=1/Ru;wpBp=1/Rbp;
 compensationGain=-RsumFeedback/Ru;
 antiAlias=tf(1,[RsumFeedback*Csum 1]);
 compensationShape=tf([1 2*compensationZeta0*compensationW0 compensationW0^2], ...
     [1 2*compensationZeta1*compensationW0 compensationW0^2]);
 ideal.COMP_TARGET=minreal(compensationGain*compensationShape*antiAlias,1e-9);
-ideal.COMP=ideal.COMP_TARGET;
-ideal.COMP_OPAMP_IDEAL=minreal(ideal.SUM_OPAMP_IDEAL* ...
-    (wpU+wpBp*ideal.BP_OPAMP_IDEAL),1e-9);
-ideal.LP_PGA_OPAMP_IDEAL=minreal(ideal.LP_OPAMP_IDEAL* ...
-    ideal.SUM_OPAMP_IDEAL*(wpU+wpBp*ideal.BP_OPAMP_IDEAL),1e-9);
 
 % PSoC 5LP en modo High: A(s) de un polo, Rin y Rout finitos. La carga
-% del BP es la rama de 8.2 k del sumador y la del SUM se aproxima por R1 LP.
+% del BP es la rama Rbp calibrada y la del SUM se aproxima por R1 LP.
 ideal.BP=makeBpNonideal(RinBp,RfBp,CinBp,CfBp,Rbp,cfg.opamp);
 ideal.SUM=makeSumNonideal(RsumFeedback,Csum,Ru,Rbp,R1,cfg.opamp);
 ideal.LP=makeMfbLowpassNonideal(R1,R2,R3,C1,C2,cfg.opamp);
 ideal.COMP_CIRCUIT=minreal(ideal.SUM*(wpU+wpBp*ideal.BP),1e-9);
+ideal.COMP=ideal.COMP_CIRCUIT;
 ideal.LP_PGA=minreal(ideal.LP*ideal.SUM*(wpU+wpBp*ideal.BP),1e-9);
-
-% Curva conservadora de dinámica AC con el GBW mínimo especificado (3 MHz).
-psocMinimum=cfg.opamp;
-psocMinimum.GainBandwidthHz=cfg.opamp.DataSheetMinimumGainBandwidthHz;
-psocMinimum.DominantPoleHz=psocMinimum.GainBandwidthHz/psocMinimum.OpenLoopGain;
-ideal.BP_PSOC_MIN=makeBpNonideal(RinBp,RfBp,CinBp,CfBp,Rbp,psocMinimum);
-ideal.SUM_PSOC_MIN=makeSumNonideal(RsumFeedback,Csum,Ru,Rbp,R1,psocMinimum);
-ideal.LP_PSOC_MIN=makeMfbLowpassNonideal(R1,R2,R3,C1,C2,psocMinimum);
-ideal.COMP_PSOC_MIN=minreal(ideal.SUM_PSOC_MIN* ...
-    (wpU+wpBp*ideal.BP_PSOC_MIN),1e-9);
-ideal.LP_PGA_PSOC_MIN=minreal(ideal.LP_PSOC_MIN*ideal.SUM_PSOC_MIN* ...
-    (wpU+wpBp*ideal.BP_PSOC_MIN),1e-9);
-bpNumeratorCoefficient=RfBp*CinBp/bpA2;
 realizedZeta=compensationZeta1-(Ru/Rbp)* ...
     bpNumeratorCoefficient/(2*compensationW0);
-requiredRbp=Ru*bpNumeratorCoefficient/ ...
-    (2*compensationW0*(compensationZeta1-compensationZeta0));
 ideal.compensation=struct('Zeta0',compensationZeta0, ...
     'Zeta1',compensationZeta1,'RealizedZeta',realizedZeta, ...
     'W0RadPerS',compensationW0,'F0Hz',compensationW0/(2*pi), ...
     'GainVPerV',compensationGain, ...
     'AntiAliasPoleHz',1/(2*pi*RsumFeedback*Csum), ...
-    'RequiredRbpOhm',requiredRbp,'InstalledRbpOhm',Rbp);
+    'RuOhm',Ru,'RbpFixedOhm',RbpFixed, ...
+    'RbpPotMaximumOhm',RbpPotMaximum, ...
+    'NullRbpOhm',nullRbp,'NullPotOhm',nullRbp-RbpFixed, ...
+    'RequiredRbpOhm',requiredRbp, ...
+    'RequiredPotOhm',requiredRbp-RbpFixed, ...
+    'InstalledRbpOhm',Rbp);
 zeta=0.25;w0=2*pi*10;
-ideal.GEOPHONE=tf([zeta*w0 0],[1 zeta*w0 w0^2]);
+ideal.GEOPHONE=tf([zeta*w0 0],[1 2*zeta*w0 w0^2]);
 ideal.GEO_LP=minreal(ideal.GEOPHONE*ideal.LP_PGA,1e-9);
-ideal.GEO_LP_OPAMP_IDEAL=minreal(ideal.GEOPHONE*ideal.LP_PGA_OPAMP_IDEAL,1e-9);
-ideal.GEO_LP_PSOC_MIN=minreal(ideal.GEOPHONE*ideal.LP_PGA_PSOC_MIN,1e-9);
-end
-
-function model=makeBp(Rin,Rf,Cin,Cf)
-model=tf([-Rf*Cin 0],[Rin*Rf*Cin*Cf,Rin*Cin+Rf*Cf,1]);
 end
 
 function model=makeBpNonideal(Rin,Rf,Cin,Cf,Rload,opamp)
@@ -865,79 +1012,111 @@ function A=opAmpOpenLoop(opamp)
 A=tf(opamp.OpenLoopGain,[1/(2*pi*opamp.DominantPoleHz) 1]);
 end
 
+function compensation=estimatePotentiometerSetting(bp,comp,compensation,cfg)
+% Diagnóstico solamente: usa BP y CH3 medidos para estimar el Rbp efectivo.
+minimumHz=0.5;maximumHz=200;minimumCoherence=max(0.8,cfg.minFitCoherence);
+mask=comp.f>=minimumHz & comp.f<=maximumHz & ...
+    comp.coherence>=minimumCoherence;
+f=comp.f(mask);hComp=comp.response(mask);
+hBp=interp1(log(bp.f),bp.response,log(f),'linear',NaN);
+bpCoherence=interp1(log(bp.f),bp.coherence,log(f),'linear',NaN);
+valid=isfinite(hBp)&isfinite(bpCoherence)&bpCoherence>=minimumCoherence;
+f=f(valid);hComp=hComp(valid);hBp=hBp(valid);
+weights=(comp.coherence(mask).^2);weights=weights(valid).*bpCoherence(valid).^2;
+compensation.EstimatedRbpOhm=NaN;
+compensation.EstimatedPotOhm=NaN;
+compensation.EstimatedZeta=NaN;
+compensation.PotFitRelativeComplexError=NaN;
+compensation.PotFitPointCount=numel(f);
+if numel(f)<8,return;end
+lower=compensation.RbpFixedOhm;
+upper=lower+compensation.RbpPotMaximumOhm;
+objective=@(rbp)potFitObjective(rbp,f,hComp,hBp,weights,cfg,compensation.RuOhm);
+[estimate,value]=fminbnd(objective,lower,upper,optimset('Display','off','TolX',0.01));
+compensation.EstimatedRbpOhm=estimate;
+compensation.EstimatedPotOhm=estimate-lower;
+compensation.PotFitRelativeComplexError=sqrt(value);
+bpCoefficient=compensation.Zeta1*2*compensation.W0RadPerS* ...
+    compensation.NullRbpOhm/compensation.RuOhm;
+compensation.EstimatedZeta=compensation.Zeta1- ...
+    (compensation.RuOhm/estimate)*bpCoefficient/(2*compensation.W0RadPerS);
+end
+
+function value=potFitObjective(rbp,f,hComp,hBp,weights,cfg,ru)
+hSum=responseAt(makeSumNonideal(27e3,15e-9,ru,rbp,30e3,cfg.opamp),f);
+prediction=hSum.*(1/ru+hBp/rbp);
+value=sum(weights.*abs(hComp-prediction).^2)/ ...
+    max(eps,sum(weights.*abs(hComp).^2));
+end
+
 function row=stageMetrics(name,processed,raw,mask,model,ideal,monteCarlo)
 f=processed.f(mask);h=processed.response(mask);hm=responseAt(model,f);
 [fitMag,fitPhase]=responseErrors(h,hm);
 row=emptySummaryRow(); row.Stage=string(name);row.PointsUsed=nnz(mask);
 row.MinFrequencyHz=min(f);row.MaxFrequencyHz=max(f);row.MedianCoherence=median(processed.coherence(mask));
-row.TfestMagnitudeRmseDb=fitMag;row.TfestPhaseRmseDeg=fitPhase;
+row.TfestFitMagnitudeRmseDb=fitMag;row.TfestFitPhaseRmseDeg=fitPhase;
 poles=pole(model);pf=sort(abs(poles)/(2*pi));row.IdentifiedF1Hz=pf(1);
 if numel(pf)>1,row.IdentifiedF2Hz=pf(end);end
 if numel(poles)==2&&any(abs(imag(poles))>0),row.IdentifiedQ=abs(poles(1))/max(eps,-2*real(poles(1)));end
 
 rawAt=interp1(log(raw.f),raw.response,log(f),'linear',NaN);
 [row.FilterChangeMagnitudeRmseDb,row.FilterChangePhaseRmseDeg]=responseErrors(h,rawAt);
-[row.PsocMinimumMagnitudeRmseDb,row.PsocMinimumPhaseRmseDeg]= ...
-    responseErrors(h,responseAt(ideal.([name '_PSOC_MIN']),f));
-row.PsocMinimumReference="PSoC 5LP, GBW mínimo 3 MHz";
+referenceModel=ideal.(name);
+if strcmp(name,'COMP'),referenceModel=ideal.COMP_CIRCUIT;end
+reference=responseAt(referenceModel,f);
+[row.TfestVsPsocHighMagnitudeRmseDb,row.TfestVsPsocHighPhaseRmseDeg]= ...
+    responseErrors(hm,reference);
+[row.ProcessedVsPsocHighMagnitudeRmseDb,row.ProcessedVsPsocHighPhaseRmseDeg]= ...
+    responseErrors(h,reference);
+row.PsocHighReference="PSoC 5LP High, componentes actuales";
 switch name
     case 'BP'
         row.SignalDefinition="CH2(BP) / CH1(PGA)";
-        [row.IdealMagnitudeRmseDb,row.IdealPhaseRmseDeg]=responseErrors(h,responseAt(ideal.BP,f));
-        [row.OpAmpIdealMagnitudeRmseDb,row.OpAmpIdealPhaseRmseDeg]= ...
-            responseErrors(h,responseAt(ideal.BP_OPAMP_IDEAL,f));
-        row.IdealReference="BP nominal + PSoC High";
-        row.OpAmpIdealReference="BP con operacional ideal";
         row.IdentificationStatus="parcial: polo inferior fuera de banda; alta frecuencia no ideal";
     case 'COMP'
         row.SignalDefinition="CH3(compensador) / CH1(PGA)";
-        [row.IdealMagnitudeRmseDb,row.IdealPhaseRmseDeg]= ...
-            responseErrors(h,responseAt(ideal.COMP_TARGET,f));
-        [row.OpAmpIdealMagnitudeRmseDb,row.OpAmpIdealPhaseRmseDeg]= ...
-            responseErrors(h,responseAt(ideal.COMP_OPAMP_IDEAL,f));
-        [row.AlternativeMagnitudeRmseDb,row.AlternativePhaseRmseDeg]= ...
-            responseErrors(h,responseAt(ideal.COMP_CIRCUIT,f));
-        row.IdealReference="-3.6*Hcompensate/(1+s*27k*15n)";
-        row.OpAmpIdealReference="componentes actuales, operacional ideal";
-        row.AlternativeReference="componentes actuales, PSoC High";
-        row.IdentificationStatus=sprintf( ...
-            'objetivo zeta0=%.4g; componentes actuales producen zeta=%.5g', ...
-            ideal.compensation.Zeta0,ideal.compensation.RealizedZeta);
+        if isfinite(ideal.compensation.EstimatedPotOhm) && ...
+                ideal.compensation.PotFitRelativeComplexError<=0.35
+            row.IdentificationStatus=sprintf( ...
+                ['objetivo zeta0=%.4g; pot objetivo %.3f ohm; ' ...
+                'pot estimado en estas capturas %.3f ohm (error complejo %.3f)'], ...
+                ideal.compensation.Zeta0,ideal.compensation.RequiredPotOhm, ...
+                ideal.compensation.EstimatedPotOhm, ...
+                ideal.compensation.PotFitRelativeComplexError);
+        else
+            row.IdentificationStatus=sprintf( ...
+                ['objetivo zeta0=%.4g; pot objetivo %.3f ohm; ' ...
+                'estimación del pot no confiable (error complejo %.3f)'], ...
+                ideal.compensation.Zeta0,ideal.compensation.RequiredPotOhm, ...
+                ideal.compensation.PotFitRelativeComplexError);
+        end
     case 'LP'
         row.SignalDefinition="CH4(ADC/LP) / CH3(compensador)";
-        [row.IdealMagnitudeRmseDb,row.IdealPhaseRmseDeg]=responseErrors(h,responseAt(ideal.LP,f));
-        [row.OpAmpIdealMagnitudeRmseDb,row.OpAmpIdealPhaseRmseDeg]= ...
-            responseErrors(h,responseAt(ideal.LP_OPAMP_IDEAL,f));
-        row.IdealReference="MFB nominal + PSoC High";
-        row.OpAmpIdealReference="MFB con operacional ideal";
         row.IdentificationStatus="confiable en la banda útil seleccionada";
     case 'LP_PGA'
         row.SignalDefinition="Cadena PGA->ADC medida directamente: CH4/CH1";
-        [row.IdealMagnitudeRmseDb,row.IdealPhaseRmseDeg]=responseErrors(h,responseAt(ideal.LP_PGA,f));
-        [row.OpAmpIdealMagnitudeRmseDb,row.OpAmpIdealPhaseRmseDeg]= ...
-            responseErrors(h,responseAt(ideal.LP_PGA_OPAMP_IDEAL,f));
-        row.IdealReference="Hlp*Hsum*(1/7.5k + Hbp/8.2k), PSoC High";
-        row.OpAmpIdealReference="Cadena PGA->ADC con operacionales ideales";
         row.IdentifiedF1Hz=NaN;row.IdentifiedF2Hz=NaN;
         row.IdentificationStatus="confiable en banda útil; dinámica subsónica no observable";
     case 'GEO_LP'
         row.SignalDefinition="Cadena GEO->ADC calculada: Hgeo nominal * CH4/CH1";
-        [row.IdealMagnitudeRmseDb,row.IdealPhaseRmseDeg]=responseErrors(h,responseAt(ideal.GEO_LP,f));
-        [row.OpAmpIdealMagnitudeRmseDb,row.OpAmpIdealPhaseRmseDeg]= ...
-            responseErrors(h,responseAt(ideal.GEO_LP_OPAMP_IDEAL,f));
-        row.IdealReference="Hgeo*Hlp*Hsum*(1/7.5k + Hbp/8.2k), PSoC High";
-        row.OpAmpIdealReference="Cadena GEO->ADC con operacionales ideales";
         row.IdentifiedF1Hz=NaN;row.IdentifiedF2Hz=NaN;
         row.IdentificationStatus="calculada con Hgeo nominal; no es una quinta medición";
 end
 
 envelope=toleranceEnvelope(monteCarlo,name,f,ideal);
+potEnvelope=potentiometerRangeEnvelope(monteCarlo,name,f,ideal);
 measuredMagnitude=20*log10(abs(h));
 measuredPhase=alignPhase(unwrap(angle(h))*180/pi,envelope.nominalPhaseDeg);
 row.MagnitudeInsideMonteCarloPercent=100*mean(measuredMagnitude>=envelope.magnitudeMinDb & ...
     measuredMagnitude<=envelope.magnitudeMaxDb);
 row.PhaseInsideMonteCarloPercent=100*mean(measuredPhase>=envelope.phaseMinDeg & ...
     measuredPhase<=envelope.phaseMaxDeg);
+row.MagnitudeInsideFullPotRangePercent=100*mean( ...
+    measuredMagnitude>=potEnvelope.magnitudeMinDb & ...
+    measuredMagnitude<=potEnvelope.magnitudeMaxDb);
+row.PhaseInsideFullPotRangePercent=100*mean( ...
+    measuredPhase>=potEnvelope.phaseMinDeg & ...
+    measuredPhase<=potEnvelope.phaseMaxDeg);
 end
 
 function [mag,phase]=responseErrors(a,b)
@@ -959,26 +1138,47 @@ end
 function plotStage(name,raw,processed,model,ideal,monteCarlo,cfg,outputRoot)
 f=processed.f;h=processed.response;gridF=logspace(log10(min(f)),log10(max(f)),900).';hm=responseAt(model,gridF);
 envelope=toleranceEnvelope(monteCarlo,name,gridF,ideal);
+potEnvelope=potentiometerRangeEnvelope(monteCarlo,name,gridF,ideal);
 fig=figure('Visible',onOff(cfg.showFigures),'Color','w','Position',[100 100 1100 820]);
 layout=tiledlayout(fig,3,1,'TileSpacing','compact','Padding','compact');
-nexttile;fill([gridF;flipud(gridF)],[envelope.magnitudeMinDb;flipud(envelope.magnitudeMaxDb)], ...
-    [0.55 0.78 1],'FaceAlpha',0.28,'EdgeColor','none', ...
-    'DisplayName',sprintf('Monte Carlo min-max (N=%d)',monteCarlo.sampleCount));
+nexttile;fill([gridF;flipud(gridF)], ...
+    [potEnvelope.magnitudeMinDb;flipud(potEnvelope.magnitudeMaxDb)], ...
+    [1.00 0.72 0.32],'FaceAlpha',0.24,'EdgeColor','none', ...
+    'DisplayName',sprintf('Tolerancias + pot 0..2 kOhm (%d posiciones)', ...
+    monteCarlo.potentiometerEnvelopeSteps));
 set(gca,'XScale','log');hold on;
+semilogx(gridF,potEnvelope.magnitudeMinDb,'Color',[0.90 0.48 0.10], ...
+    'LineWidth',0.7,'HandleVisibility','off');
+semilogx(gridF,potEnvelope.magnitudeMaxDb,'Color',[0.90 0.48 0.10], ...
+    'LineWidth',0.7,'HandleVisibility','off');
+fill([gridF;flipud(gridF)],[envelope.magnitudeMinDb;flipud(envelope.magnitudeMaxDb)], ...
+    [0.55 0.78 1],'FaceAlpha',0.28,'EdgeColor','none', ...
+    'DisplayName',sprintf('Tolerancias con pot recalibrado (N=%d)',monteCarlo.sampleCount));
 semilogx(gridF,envelope.magnitudeMinDb,'Color',[0.35 0.65 0.92], ...
     'LineWidth',0.7,'HandleVisibility','off');
 semilogx(gridF,envelope.magnitudeMaxDb,'Color',[0.35 0.65 0.92], ...
     'LineWidth',0.7,'HandleVisibility','off');
 semilogx(raw.f,20*log10(abs(raw.response)),'.','Color',[.7 .7 .7],'DisplayName','Cruda');
 semilogx(f,20*log10(abs(h)),'ko','MarkerSize',4,'DisplayName','Procesada');
-semilogx(gridF,20*log10(abs(hm)),'LineWidth',1.6,'DisplayName','tfest');plotIdeal(name,ideal,gridF,false,[]);
+semilogx(gridF,20*log10(abs(hm)),'LineWidth',1.6,'DisplayName','tfest');
+plotPsocHigh(name,ideal,gridF,false,[]);
 grid on;ylabel('Magnitud (dB)');legend('Location','best');
 nexttile;rawPhase=unwrap(angle(raw.response))*180/pi;procPhase=unwrap(angle(h))*180/pi;
 phaseShift=360*round((median(procPhase)-median(envelope.nominalPhaseDeg))/360);
 phaseMin=envelope.phaseMinDeg+phaseShift;phaseMax=envelope.phaseMaxDeg+phaseShift;
-fill([gridF;flipud(gridF)],[phaseMin;flipud(phaseMax)], ...
-    [0.55 0.78 1],'FaceAlpha',0.28,'EdgeColor','none','DisplayName','Monte Carlo min-max');
+potPhaseMin=potEnvelope.phaseMinDeg+phaseShift;
+potPhaseMax=potEnvelope.phaseMaxDeg+phaseShift;
+fill([gridF;flipud(gridF)],[potPhaseMin;flipud(potPhaseMax)], ...
+    [1.00 0.72 0.32],'FaceAlpha',0.24,'EdgeColor','none', ...
+    'DisplayName','Tolerancias + pot 0..2 kOhm');
 set(gca,'XScale','log');hold on;
+semilogx(gridF,potPhaseMin,'Color',[0.90 0.48 0.10], ...
+    'LineWidth',0.7,'HandleVisibility','off');
+semilogx(gridF,potPhaseMax,'Color',[0.90 0.48 0.10], ...
+    'LineWidth',0.7,'HandleVisibility','off');
+fill([gridF;flipud(gridF)],[phaseMin;flipud(phaseMax)], ...
+    [0.55 0.78 1],'FaceAlpha',0.28,'EdgeColor','none', ...
+    'DisplayName','Tolerancias con pot recalibrado');
 semilogx(gridF,phaseMin,'Color',[0.35 0.65 0.92], ...
     'LineWidth',0.7,'HandleVisibility','off');
 semilogx(gridF,phaseMax,'Color',[0.35 0.65 0.92], ...
@@ -986,22 +1186,71 @@ semilogx(gridF,phaseMax,'Color',[0.35 0.65 0.92], ...
 semilogx(raw.f,rawPhase,'.','Color',[.7 .7 .7],'DisplayName','Cruda');
 semilogx(f,procPhase,'ko','MarkerSize',4,'DisplayName','Procesada');
 semilogx(gridF,alignPhase(unwrap(angle(hm))*180/pi,procPhase),'LineWidth',1.6,'DisplayName','tfest');
-plotIdeal(name,ideal,gridF,true,procPhase);grid on;ylabel('Fase (grados)');
+plotPsocHigh(name,ideal,gridF,true,procPhase);grid on;ylabel('Fase (grados)');
 coherenceThreshold=cfg.minFitCoherence;
 nexttile;semilogx(f,processed.coherence,'o-');hold on;
 yline(coherenceThreshold,'--','Umbral');grid on;ylim([0 1.05]);
 ylabel('Coherencia local');xlabel('Frecuencia (Hz)');
 [displayName,baseName]=stagePresentation(name);
-if strcmp(name,'COMP')
-    title(layout,sprintf('%s: medición, tfest, Hcompensate, componentes y tolerancias', ...
-        displayName),'Interpreter','none');
-else
-    title(layout,sprintf('%s: medición, tfest, PSoC High, ideal y tolerancias', ...
-        displayName),'Interpreter','none');
-end
+title(layout,sprintf('%s: medición, PSoC High, tolerancias y recorrido del pot', ...
+    displayName),'Interpreter','none');
 base=fullfile(outputRoot,baseName);
 exportgraphics(fig,[base '.png'],'Resolution',180);savefig(fig,[base '.fig']);
 if cfg.showFigures,drawnow;else,close(fig);end
+end
+
+function plotNormalizedStage(name,raw,processed,model,ideal,cfg,outputRoot)
+% Comparación de forma: cada curva se lleva independientemente a un máximo
+% de 0 dB dentro de la banda mostrada. La fase y la coherencia no cambian.
+f=processed.f;h=processed.response;
+gridF=logspace(log10(min(f)),log10(max(f)),900).';
+hm=responseAt(model,gridF);
+referenceModel=ideal.(name);
+if strcmp(name,'COMP'),referenceModel=ideal.COMP_CIRCUIT;end
+hp=responseAt(referenceModel,gridF);
+rawMask=raw.f>=min(gridF)&raw.f<=max(gridF);
+rawF=raw.f(rawMask);rawH=raw.response(rawMask);
+
+fig=figure('Visible',onOff(cfg.showFigures),'Color','w','Position',[120 80 1100 820]);
+layout=tiledlayout(fig,3,1,'TileSpacing','compact','Padding','compact');
+nexttile;
+semilogx(rawF,normalizedMagnitudeDb(rawH),'.','Color',[.7 .7 .7], ...
+    'DisplayName','Cruda');hold on;
+semilogx(f,normalizedMagnitudeDb(h),'ko','MarkerSize',4,'DisplayName','Procesada');
+semilogx(gridF,normalizedMagnitudeDb(hm),'LineWidth',1.6,'DisplayName','tfest');
+semilogx(gridF,normalizedMagnitudeDb(hp),'--','Color',[0.85 0.25 0.12], ...
+    'LineWidth',1.5,'DisplayName','PSoC High completo, componentes actuales');
+yline(0,':','0 dB','HandleVisibility','off');
+grid on;ylabel('Magnitud normalizada (dB)');legend('Location','best');
+
+nexttile;
+rawPhase=unwrap(angle(rawH))*180/pi;procPhase=unwrap(angle(h))*180/pi;
+semilogx(rawF,rawPhase,'.','Color',[.7 .7 .7],'DisplayName','Cruda');hold on;
+semilogx(f,procPhase,'ko','MarkerSize',4,'DisplayName','Procesada');
+semilogx(gridF,alignPhase(unwrap(angle(hm))*180/pi,procPhase), ...
+    'LineWidth',1.6,'DisplayName','tfest');
+semilogx(gridF,alignPhase(unwrap(angle(hp))*180/pi,procPhase),'--', ...
+    'Color',[0.85 0.25 0.12],'LineWidth',1.5, ...
+    'DisplayName','PSoC High completo, componentes actuales');
+grid on;ylabel('Fase (grados)');
+
+nexttile;
+semilogx(f,processed.coherence,'o-');hold on;
+yline(cfg.minFitCoherence,'--','Umbral');grid on;ylim([0 1.05]);
+ylabel('Coherencia local');xlabel('Frecuencia (Hz)');
+
+[displayName,baseName]=stagePresentation(name);
+title(layout,sprintf('%s normalizado: máximo independiente de cada curva = 0 dB', ...
+    displayName),'Interpreter','none');
+base=fullfile(outputRoot,['normalizado_' baseName]);
+exportgraphics(fig,[base '.png'],'Resolution',180);savefig(fig,[base '.fig']);
+if cfg.showFigures,drawnow;else,close(fig);end
+end
+
+function magnitudeDb=normalizedMagnitudeDb(response)
+magnitudeDb=20*log10(abs(response)+eps);
+valid=isfinite(magnitudeDb);
+if any(valid),magnitudeDb=magnitudeDb-max(magnitudeDb(valid));end
 end
 
 function [displayName,baseName]=stagePresentation(name)
@@ -1022,11 +1271,13 @@ end
 end
 
 function monteCarlo=createMonteCarloSamples(cfg)
-state=rng;cleanup=onCleanup(@()rng(state)); %#ok<NASGU>
+state=rng;cleanup=onCleanup(@()rng(state));
 rng(cfg.monteCarloSeed,'twister');n=cfg.monteCarloSamples;t=cfg.tolerance;
 monteCarlo.sampleCount=n;monteCarlo.seed=cfg.monteCarloSeed;
 monteCarlo.opamp=cfg.opamp;
 monteCarlo.frequencyChunkSize=cfg.monteCarloFrequencyChunkSize;
+monteCarlo.potentiometerEnvelopeSteps=cfg.potentiometerEnvelopeSteps;
+monteCarlo.potentiometerMaximumOhm=cfg.components.RbpPotMaximumOhm;
 monteCarlo.RinBp=sampleComponent(43e3,n,t.resistorMinus,t.resistorPlus);
 monteCarlo.RfBp=sampleComponent(47e3,n,t.resistorMinus,t.resistorPlus);
 monteCarlo.CinBp=sampleComponent(680e-6,n,t.electrolyticMinus,t.electrolyticPlus);
@@ -1039,8 +1290,22 @@ monteCarlo.R2Lp=sampleComponent(150e3,n,t.resistorMinus,t.resistorPlus);
 monteCarlo.R3Lp=sampleComponent(12e3,n,t.resistorMinus,t.resistorPlus);
 monteCarlo.C1Lp=sampleComponent(47e-9,n,t.ceramicMinus,t.ceramicPlus);
 monteCarlo.C2Lp=sampleComponent(3.3e-9,n,t.ceramicMinus,t.ceramicPlus);
-monteCarlo.RwpU=sampleComponent(7.5e3,n,t.resistorMinus,t.resistorPlus);
-monteCarlo.RwpBp=sampleComponent(8.2e3,n,t.resistorMinus,t.resistorPlus);
+monteCarlo.RwpU=sampleComponent(cfg.components.RuOhm,n, ...
+    t.resistorMinus,t.resistorPlus);
+monteCarlo.RbpFixed=sampleComponent(cfg.components.RbpFixedOhm,n, ...
+    t.resistorMinus,t.resistorPlus);
+cf=monteCarlo.CfBp150+monteCarlo.CfBp27;
+a2=monteCarlo.RinBp.*monteCarlo.RfBp.*monteCarlo.CinBp.*cf;
+a1=monteCarlo.RinBp.*monteCarlo.CinBp+monteCarlo.RfBp.*cf;
+zeta1=a1./(2*sqrt(a2));
+bpPeakGain=monteCarlo.RfBp.*monteCarlo.CinBp./a1;
+required=monteCarlo.RwpU.*bpPeakGain./ ...
+    (1-cfg.components.CompensationZeta0./zeta1);
+lower=monteCarlo.RbpFixed;
+upper=lower+cfg.components.RbpPotMaximumOhm;
+monteCarlo.PotWithinRange=required>=lower & required<=upper;
+monteCarlo.RwpBp=min(max(required,lower),upper);
+monteCarlo.RbpPotOhm=monteCarlo.RwpBp-monteCarlo.RbpFixed;
 end
 
 function values=sampleComponent(nominal,count,minusTolerance,plusTolerance)
@@ -1066,7 +1331,7 @@ switch name
         response=hLp.*hSum.*(1./monteCarlo.RwpU+hBp./monteCarlo.RwpBp);
         if strcmp(name,'GEO_LP')
             zeta=0.25;w0=2*pi*10;
-            hGeo=(zeta*w0*s)./(s.^2+zeta*w0*s+w0^2);
+            hGeo=(zeta*w0*s)./(s.^2+2*zeta*w0*s+w0^2);
             response=response.*hGeo;
         end
     otherwise
@@ -1138,6 +1403,42 @@ end
 envelope.nominalPhaseDeg=nominalPhase;
 end
 
+function envelope=potentiometerRangeEnvelope(monteCarlo,name,f,ideal)
+% Unión de las tolerancias R/C y todo el recorrido eléctrico del cursor.
+% Incluye explícitamente ambos extremos y una malla uniforme intermedia.
+nominalModel=ideal.(name);
+if strcmp(name,'COMP'),nominalModel=ideal.COMP_CIRCUIT;end
+nominalPhase=unwrap(angle(responseAt(nominalModel,f)))*180/pi;
+nFrequency=numel(f);
+envelope.magnitudeMinDb=inf(nFrequency,1);
+envelope.magnitudeMaxDb=-inf(nFrequency,1);
+envelope.phaseMinDeg=inf(nFrequency,1);
+envelope.phaseMaxDeg=-inf(nFrequency,1);
+positions=linspace(0,monteCarlo.potentiometerMaximumOhm, ...
+    monteCarlo.potentiometerEnvelopeSteps);
+for first=1:monteCarlo.frequencyChunkSize:nFrequency
+    index=first:min(nFrequency,first+monteCarlo.frequencyChunkSize-1);
+    anchor=max(1,round(numel(index)/2));
+    for potOhm=positions
+        varied=monteCarlo;
+        varied.RwpBp=varied.RbpFixed+potOhm;
+        response=monteCarloResponse(varied,name,f(index));
+        magnitude=20*log10(abs(response)+eps);
+        phase=unwrap(angle(response),[],2)*180/pi;
+        phase=phase+360*round((nominalPhase(index(anchor))-phase(:,anchor))/360);
+        envelope.magnitudeMinDb(index)=min(envelope.magnitudeMinDb(index), ...
+            min(magnitude,[],1).');
+        envelope.magnitudeMaxDb(index)=max(envelope.magnitudeMaxDb(index), ...
+            max(magnitude,[],1).');
+        envelope.phaseMinDeg(index)=min(envelope.phaseMinDeg(index), ...
+            min(phase,[],1).');
+        envelope.phaseMaxDeg(index)=max(envelope.phaseMaxDeg(index), ...
+            max(phase,[],1).');
+    end
+end
+envelope.nominalPhaseDeg=nominalPhase;
+end
+
 function tableOut=toleranceTable(cfg)
 ComponentClass=["Resistencia";"Cerámico <=100 nF";"Electrolítico >100 nF"];
 MinusPercent=100*[cfg.tolerance.resistorMinus;cfg.tolerance.ceramicMinus;cfg.tolerance.electrolyticMinus];
@@ -1152,14 +1453,27 @@ function tableOut=compensationParameterTable(ideal)
 c=ideal.compensation;
 Parameter=["zeta0_objetivo";"zeta1_denominador_BP"; ...
     "zeta_realizada_componentes";"w0";"f0";"ganancia_DC"; ...
-    "polo_antialias";"R_BP_instalada";"R_BP_requerida_para_zeta0"];
+    "polo_antialias";"Ru";"R_BP_fija";"pot_maximo"; ...
+    "R_BP_nulo";"pot_nulo";"R_BP_requerida_para_zeta0"; ...
+    "pot_requerido_para_zeta0";"R_BP_estimada_en_medicion"; ...
+    "pot_estimado_en_medicion";"error_relativo_estimacion_pot"];
 Value=[c.Zeta0;c.Zeta1;c.RealizedZeta;c.W0RadPerS;c.F0Hz; ...
-    c.GainVPerV;c.AntiAliasPoleHz;c.InstalledRbpOhm;c.RequiredRbpOhm];
-Unit=["1";"1";"1";"rad/s";"Hz";"V/V";"Hz";"ohm";"ohm"];
+    c.GainVPerV;c.AntiAliasPoleHz;c.RuOhm;c.RbpFixedOhm; ...
+    c.RbpPotMaximumOhm;c.NullRbpOhm;c.NullPotOhm;c.RequiredRbpOhm; ...
+    c.RequiredPotOhm;c.EstimatedRbpOhm;c.EstimatedPotOhm; ...
+    c.PotFitRelativeComplexError];
+Unit=["1";"1";"1";"rad/s";"Hz";"V/V";"Hz";"ohm";"ohm"; ...
+    "ohm";"ohm";"ohm";"ohm";"ohm";"ohm";"ohm";"1"];
 Description=["Numerador de Hcompensate";"Calculada del denominador BP nominal"; ...
     "Resultado analítico de 1+(Ru/Rbp)Hbp";"Frecuencia natural BP"; ...
-    "Frecuencia natural BP";"-27k/7.5k";"1/(2*pi*27k*15n)"; ...
-    "Valor usado en la rama BP";"Valor ideal con componentes nominales"];
+    "Frecuencia natural BP";"-27k/Ru";"1/(2*pi*27k*15n)"; ...
+    "Resistencia de entrada directa";"Resistencia fija de rama BP"; ...
+    "Recorrido nominal del potenciómetro";"Total que produce cancelación nula"; ...
+    "Ajuste del potenciómetro para cancelación nula"; ...
+    "Total ideal con componentes nominales";"Ajuste ideal del potenciómetro"; ...
+    "Estimación desde CH1, CH2 y CH3 medidos"; ...
+    "Estimación del cursor desde CH1, CH2 y CH3"; ...
+    "Residuo complejo normalizado de la estimación"];
 tableOut=table(Parameter,Value,Unit,Description);
 end
 
@@ -1222,39 +1536,17 @@ tableOut=table(frequencyHz,modelMaximumSinePeakV, ...
     'DataSheetMinimumMaximumSinePeakV'});
 end
 
-function plotIdeal(name,ideal,f,phasePlot,reference)
-if strcmp(name,'COMP')
-    psocResponse=responseAt(ideal.COMP_CIRCUIT,f);
-    targetResponse=responseAt(ideal.COMP_TARGET,f);
-else
-    psocResponse=responseAt(ideal.(name),f);
-    targetResponse=[];
-end
-idealResponse=responseAt(ideal.([name '_OPAMP_IDEAL']),f);
-minimumResponse=responseAt(ideal.([name '_PSOC_MIN']),f);
+function plotPsocHigh(name,ideal,f,phasePlot,reference)
+model=ideal.(name);
+if strcmp(name,'COMP'),model=ideal.COMP_CIRCUIT;end
+psocResponse=responseAt(model,f);
 if phasePlot
     psocValue=alignPhase(unwrap(angle(psocResponse))*180/pi,reference);
-    idealValue=alignPhase(unwrap(angle(idealResponse))*180/pi,reference);
-    minimumValue=alignPhase(unwrap(angle(minimumResponse))*180/pi,reference);
-    if ~isempty(targetResponse)
-        targetValue=alignPhase(unwrap(angle(targetResponse))*180/pi,reference);
-    end
 else
     psocValue=20*log10(abs(psocResponse));
-    idealValue=20*log10(abs(idealResponse));
-    minimumValue=20*log10(abs(minimumResponse));
-    if ~isempty(targetResponse),targetValue=20*log10(abs(targetResponse));end
 end
-if ~isempty(targetResponse)
-    semilogx(f,targetValue,'k-','LineWidth',1.8, ...
-        'DisplayName','Objetivo -3.6·Hcompensate·HAA');
-end
-semilogx(f,idealValue,':','Color',[0.45 0.2 0.65],'LineWidth',1.35, ...
-    'DisplayName','Componentes actuales, operacional ideal');
-semilogx(f,minimumValue,'-.','Color',[0.2 0.55 0.25],'LineWidth',1.25, ...
-    'DisplayName','Componentes actuales, PSoC 3 MHz');
 semilogx(f,psocValue,'--','Color',[0.85 0.25 0.12],'LineWidth',1.5, ...
-    'DisplayName','Componentes actuales, PSoC High');
+    'DisplayName','PSoC High completo, componentes actuales');
 end
 
 function phase=alignPhase(phase,reference)
@@ -1325,38 +1617,77 @@ if condition,value='on';else,value='off';end
 end
 
 function writeReport(results,filename)
-fid=fopen(filename,'w');cleanup=onCleanup(@()fclose(fid)); %#ok<NASGU>
+fid=fopen(filename,'w');cleanup=onCleanup(@()fclose(fid));
 if isempty(results.missingExpectedBands),missingText='ninguna';else,missingText=strjoin(results.missingExpectedBands,', ');end
 fprintf(fid,'Análisis de sweeps de la cadena analógica\nDatos: %s\nEscala aplicada a las señales: x%.3g (sin conversión diferencial)\n', ...
     results.dataRoot,results.config.signalScale);
+if isempty(results.fixedStageDataRoots)
+    fprintf(fid,'Campañas históricas adicionales para BP/LP: ninguna\n');
+else
+    fprintf(fid,'Campañas históricas adicionales sólo para BP/LP:\n');
+    for k=1:numel(results.fixedStageDataRoots)
+        fprintf(fid,'  - %s\n',results.fixedStageDataRoots{k});
+    end
+end
 fprintf(fid,'Bandas faltantes: %s\n',missingText);
-fprintf(fid,'Geófono nominal: zeta=0.25, w0=2*pi*10 rad/s\n');
+fprintf(fid,['Geófono nominal: Hgeo=zeta*w0*s/(s^2+2*zeta*w0*s+w0^2), ' ...
+    'zeta=0.25, w0=2*pi*10 rad/s\n']);
 fprintf(fid,['Cadena completa PGA->ADC: medida directamente como CH4/CH1 y ' ...
-    'comparada con Hlp*Hsum*(1/7.5k + Hbp/8.2k).\n']);
+    'comparada con el modelo PSoC High completo y componentes actuales.\n']);
 fprintf(fid,['Cadena completa GEO->ADC: Hgeo nominal multiplicada por CH4/CH1 y ' ...
-    'comparada con Hgeo*Hlp*Hsum*(1/7.5k + Hbp/8.2k).\n']);
+    'comparada con Hgeo por el modelo PSoC High completo.\n']);
 c=results.ideal.compensation;
 fprintf(fid,['Compensador verificado directamente como CH3/CH1. Objetivo: ' ...
-    '(-27k/7.5k)*[(s^2+2*zeta0*w0*s+w0^2)/(s^2+2*zeta1*w0*s+w0^2)]' ...
+    '(-27k/6.8k)*[(s^2+2*zeta0*w0*s+w0^2)/(s^2+2*zeta1*w0*s+w0^2)]' ...
     '*[1/(1+s*27k*15n)].\n']);
 fprintf(fid,['Parámetros: zeta0=%.8g, zeta1=%.8g, w0=%.8g rad/s (%.8g Hz), ' ...
     'ganancia DC=%.8g V/V, polo antialias=%.8g Hz.\n'],c.Zeta0,c.Zeta1, ...
     c.W0RadPerS,c.F0Hz,c.GainVPerV,c.AntiAliasPoleHz);
-fprintf(fid,['Con 8.2k instalados la combinación ideal de componentes produce ' ...
-    'zeta=%.8g; para zeta0=%.8g se requieren aproximadamente %.8g ohm.\n'], ...
-    c.RealizedZeta,c.Zeta0,c.RequiredRbpOhm);
-fprintf(fid,['Saturación: cada captura se conserva para las etapas independientes ' ...
-    'y se descarta por dependencia si |V| alcanza %.4g V. CH1/CH2 invalidan ' ...
-    'BP, COMP, LP y cadena; ' ...
-    'CH3 invalida COMP, LP y cadena; CH4 invalida LP y cadena.\n'], ...
-    results.config.saturation.absoluteVoltageThresholdV);
+fprintf(fid,['Rama directa Ru=%.8g ohm. Rama BP: fija=%.8g ohm + potenciómetro ' ...
+    'de %.8g ohm. Para zeta0=%.8g se requieren Rbp=%.8g ohm, es decir, ' ...
+    'pot=%.8g ohm. El nulo está en pot=%.8g ohm.\n'],c.RuOhm, ...
+    c.RbpFixedOhm,c.RbpPotMaximumOhm,c.Zeta0,c.RequiredRbpOhm, ...
+    c.RequiredPotOhm,c.NullPotOhm);
+if isfinite(c.EstimatedPotOhm) && c.PotFitRelativeComplexError<=0.35
+    fprintf(fid,['Estimación a partir de BP y CH3 medidos: Rbp=%.8g ohm, ' ...
+        'pot=%.8g ohm, zeta estimada=%.8g, residuo complejo relativo=%.5g ' ...
+        'con %d puntos. Es un diagnóstico, no reemplaza al multímetro.\n'], ...
+        c.EstimatedRbpOhm,c.EstimatedPotOhm,c.EstimatedZeta, ...
+        c.PotFitRelativeComplexError,c.PotFitPointCount);
+else
+    fprintf(fid,['La estimación del pot a partir de BP y CH3 no es confiable: ' ...
+        'residuo complejo relativo=%.5g con %d puntos. No se interpreta el ' ...
+        'mínimo numérico como posición física; medir el pot o calibrar en el nulo.\n'], ...
+        c.PotFitRelativeComplexError,c.PotFitPointCount);
+end
+fprintf(fid,['tfest se identifica exclusivamente desde la FRF procesada. El informe ' ...
+    'separa el residuo medición-tfest de la comparación tfest-modelo PSoC High.\n']);
+fprintf(fid,['Orden tfest: se agregan dos polos y dos grados de numerador por ' ...
+    'cada operacional del camino, preservando el grado relativo nominal.\n']);
+for k=1:height(results.tfestOrders)
+    row=results.tfestOrders(k,:);
+    fprintf(fid,'  %s: nominal %d/%d, %d operacional(es), tfest %d/%d (polos/ceros).\n', ...
+        row.Stage,row.NominalPoles,row.NominalZeros,row.RelatedOpAmps, ...
+        row.TfestPoles,row.TfestZeros);
+end
+fprintf(fid,['  GEO_LP no se identifica de nuevo: compone Hgeo 2/1 con LP_PGA ' ...
+    '11/8 y por ello resulta 13/9.\n']);
+fprintf(fid,['La carpeta 06_graficos_normalizados lleva de forma independiente ' ...
+    'el máximo de cada curva a 0 dB; no altera fase ni coherencia. Las ' ...
+    'envolventes absolutas de tolerancias permanecen en las gráficas originales.\n']);
+fprintf(fid,['Saturación: al alcanzar |V| >= %.4g V se excluye un margen de %.3g ' ...
+    'ciclo alrededor de cada recorte y se identifican por separado los tramos ' ...
+    'lineales continuos. BP local usa la máscara de CH2 y LP la de CH4; una ' ...
+    'entrada local recortada sigue siendo una excitación medida. COMP usa las ' ...
+    'máscaras CH1/CH2/CH3 y la cadena PGA-ADC usa CH1..CH4. El CSV de uso ' ...
+    'informa cantidad de submuestras y fracción del sweep conservada.\n'], ...
+    results.config.saturation.absoluteVoltageThresholdV, ...
+    results.config.saturation.exclusionCycles);
 op=results.config.opamp;
 fprintf(fid,['Operacional PSoC High: A0=%.8g V/V (90 dB), GBW=%.8g Hz, ' ...
     'polo dominante=%.8g Hz, Rin=%.8g ohm, Rout=%.8g ohm, Cin=%.8g F.\n'], ...
     op.OpenLoopGain,op.GainBandwidthHz,op.DominantPoleHz, ...
     op.InputResistanceOhm,op.OutputResistanceOhm,op.InputCapacitanceF);
-fprintf(fid,'Referencia conservadora datasheet: GBW mínimo %.8g Hz, SR mínimo %.8g V/s.\n', ...
-    op.DataSheetMinimumGainBandwidthHz,op.DataSheetMinimumSlewRateVPerS);
 fprintf(fid,['SR del modelo %.8g V/s: se evalúa como límite de gran señal, no ' ...
     'como parte de la TF lineal. Margen conservador mínimo observado: %.5g ' ...
     '(modelo), %.5g (SR mínimo datasheet).\n'],op.SlewRateVPerS, ...
@@ -1369,6 +1700,12 @@ fprintf(fid,'Monte Carlo: %d muestras, semilla %d. R -%.3g/+%.3g %%; cerámicos 
     100*results.config.tolerance.resistorMinus,100*results.config.tolerance.resistorPlus, ...
     100*results.config.tolerance.ceramicMinus,100*results.config.tolerance.ceramicPlus, ...
     100*results.config.tolerance.electrolyticMinus,100*results.config.tolerance.electrolyticPlus);
+fprintf(fid,['En Monte Carlo el potenciómetro se recalibra en cada realización ' ...
+    'dentro de 0..2k; realizaciones dentro de rango: %.4g %%.\n'], ...
+    100*mean(results.monteCarlo.PotWithinRange));
+fprintf(fid,['La envolvente adicional barre %d posiciones, incluidos 0 y 2k, ' ...
+    'para combinar el recorrido completo del potenciómetro con las tolerancias.\n'], ...
+    results.config.potentiometerEnvelopeSteps);
 fprintf(fid,'Nota: todos los CSV informan Probe Atten=1X; verificar que coincida con la sonda física.\n\n');
 for name={'BP','COMP','LP','LP_PGA','GEO_LP'}
     sys=tf(results.models.(name{1}));[num,den]=tfdata(sys,'v');
@@ -1404,7 +1741,7 @@ end
 
 function row=emptyUsageRow()
 row=struct('Band',"",'Capture',"",'Stage',"",'Used',false, ...
-    'ExclusionReason',"");
+    'ExclusionReason',"",'LinearSubsamples',0,'RetainedSweepFraction',0);
 end
 
 function row=emptyProcessingRow()
@@ -1420,16 +1757,18 @@ end
 function row=emptySummaryRow()
 row=struct('Stage',"",'SignalDefinition',"",'IdentificationStatus',"", ...
     'PointsUsed',0,'MinFrequencyHz',NaN,'MaxFrequencyHz',NaN, ...
-    'MedianCoherence',NaN,'TfestMagnitudeRmseDb',NaN,'TfestPhaseRmseDeg',NaN, ...
+    'MedianCoherence',NaN, ...
+    'TfestFitMagnitudeRmseDb',NaN,'TfestFitPhaseRmseDeg',NaN, ...
+    'TfestVsPsocHighMagnitudeRmseDb',NaN, ...
+    'TfestVsPsocHighPhaseRmseDeg',NaN, ...
+    'ProcessedVsPsocHighMagnitudeRmseDb',NaN, ...
+    'ProcessedVsPsocHighPhaseRmseDeg',NaN, ...
     'IdentifiedF1Hz',NaN,'IdentifiedF2Hz',NaN,'IdentifiedQ',NaN, ...
     'FilterChangeMagnitudeRmseDb',NaN,'FilterChangePhaseRmseDeg',NaN, ...
-    'IdealMagnitudeRmseDb',NaN,'IdealPhaseRmseDeg',NaN, ...
-    'OpAmpIdealMagnitudeRmseDb',NaN,'OpAmpIdealPhaseRmseDeg',NaN, ...
-    'PsocMinimumMagnitudeRmseDb',NaN,'PsocMinimumPhaseRmseDeg',NaN, ...
-    'AlternativeMagnitudeRmseDb',NaN,'AlternativePhaseRmseDeg',NaN, ...
     'MagnitudeInsideMonteCarloPercent',NaN,'PhaseInsideMonteCarloPercent',NaN, ...
-    'IdealReference',"",'OpAmpIdealReference',"", ...
-    'PsocMinimumReference',"",'AlternativeReference',"");
+    'MagnitudeInsideFullPotRangePercent',NaN, ...
+    'PhaseInsideFullPotRangePercent',NaN, ...
+    'PsocHighReference',"");
 end
 
 function selected=keepLongRuns(mask,minLength)
