@@ -1,0 +1,5 @@
+Stage,NominalPoles,NominalZeros,RelatedOpAmps,AddedDegreesPerOpAmp,TfestPoles,TfestZeros
+BP,2,1,1,2,4,3
+COMP,3,2,1,2,5,4
+LP,2,0,1,2,4,2
+LP_PGA,5,2,3,2,11,8

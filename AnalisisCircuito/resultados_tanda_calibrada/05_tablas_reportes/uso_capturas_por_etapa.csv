@@ -1,0 +1,261 @@
+Band,Capture,Stage,Used,ExclusionReason,LinearSubsamples,RetainedSweepFraction
+10mHzto50mHz_400s_50s_div,XD_ALL0017_F0017,BP,1,"usada completa",1,1
+10mHzto50mHz_400s_50s_div,XD_ALL0017_F0017,COMP,1,"usada completa",1,1
+10mHzto50mHz_400s_50s_div,XD_ALL0017_F0017,LP,1,"usada completa",1,1
+10mHzto50mHz_400s_50s_div,XD_ALL0017_F0017,LP_PGA,1,"usada completa",1,1
+25mHzto250mHz_400s_50s_div,XD_ALL0014_F0014,BP,1,"usada completa",1,1
+25mHzto250mHz_400s_50s_div,XD_ALL0014_F0014,COMP,1,"usada completa",1,1
+25mHzto250mHz_400s_50s_div,XD_ALL0014_F0014,LP,1,"usada parcialmente: 1 submuestra(s), 28.7% del sweep lineal; saturación CH4",1,0.286800651819663
+25mHzto250mHz_400s_50s_div,XD_ALL0014_F0014,LP_PGA,1,"usada parcialmente: 1 submuestra(s), 28.7% del sweep lineal; saturación CH4",1,0.286800651819663
+25mHzto250mHz_400s_50s_div,XD_ALL0015_F0015,BP,1,"usada completa",1,1
+25mHzto250mHz_400s_50s_div,XD_ALL0015_F0015,COMP,1,"usada completa",1,1
+25mHzto250mHz_400s_50s_div,XD_ALL0015_F0015,LP,1,"usada completa",1,1
+25mHzto250mHz_400s_50s_div,XD_ALL0015_F0015,LP_PGA,1,"usada completa",1,1
+25mHzto250mHz_400s_50s_div,XD_ALL0016_F0016,BP,1,"usada completa",1,1
+25mHzto250mHz_400s_50s_div,XD_ALL0016_F0016,COMP,1,"usada completa",1,1
+25mHzto250mHz_400s_50s_div,XD_ALL0016_F0016,LP,1,"usada completa",1,1
+25mHzto250mHz_400s_50s_div,XD_ALL0016_F0016,LP_PGA,1,"usada completa",1,1
+100mHzto1Hz_200s_25s_div,XD_ALL0011_F0011,BP,1,"usada completa",1,1
+100mHzto1Hz_200s_25s_div,XD_ALL0011_F0011,COMP,1,"usada completa",1,1
+100mHzto1Hz_200s_25s_div,XD_ALL0011_F0011,LP,1,"usada completa",1,1
+100mHzto1Hz_200s_25s_div,XD_ALL0011_F0011,LP_PGA,1,"usada completa",1,1
+100mHzto1Hz_200s_25s_div,XD_ALL0012_F0012,BP,1,"usada completa",1,1
+100mHzto1Hz_200s_25s_div,XD_ALL0012_F0012,COMP,1,"usada completa",1,1
+100mHzto1Hz_200s_25s_div,XD_ALL0012_F0012,LP,1,"usada completa",1,1
+100mHzto1Hz_200s_25s_div,XD_ALL0012_F0012,LP_PGA,1,"usada completa",1,1
+100mHzto1Hz_200s_25s_div,XD_ALL0013_F0013,BP,1,"usada completa",1,1
+100mHzto1Hz_200s_25s_div,XD_ALL0013_F0013,COMP,1,"usada completa",1,1
+100mHzto1Hz_200s_25s_div,XD_ALL0013_F0013,LP,1,"usada completa",1,1
+100mHzto1Hz_200s_25s_div,XD_ALL0013_F0013,LP_PGA,1,"usada completa",1,1
+100mHzto1Hz_200s_25s_div,Osciloscopio_ALL0000_F0000,BP,1,"usada completa",1,1
+100mHzto1Hz_200s_25s_div,Osciloscopio_ALL0000_F0000,COMP,0,"omitida: campaña histórica sólo para BP/LP",0,0
+100mHzto1Hz_200s_25s_div,Osciloscopio_ALL0000_F0000,LP,1,"usada completa",1,1
+100mHzto1Hz_200s_25s_div,Osciloscopio_ALL0000_F0000,LP_PGA,0,"omitida: campaña histórica sólo para BP/LP",0,0
+500mHzto5Hz_40s_5s_div,XD_ALL0008_F0008,BP,1,"usada completa",1,1
+500mHzto5Hz_40s_5s_div,XD_ALL0008_F0008,COMP,1,"usada completa",1,1
+500mHzto5Hz_40s_5s_div,XD_ALL0008_F0008,LP,1,"usada completa",1,1
+500mHzto5Hz_40s_5s_div,XD_ALL0008_F0008,LP_PGA,1,"usada completa",1,1
+500mHzto5Hz_40s_5s_div,XD_ALL0009_F0009,BP,1,"usada completa",1,1
+500mHzto5Hz_40s_5s_div,XD_ALL0009_F0009,COMP,1,"usada completa",1,1
+500mHzto5Hz_40s_5s_div,XD_ALL0009_F0009,LP,1,"usada completa",1,1
+500mHzto5Hz_40s_5s_div,XD_ALL0009_F0009,LP_PGA,1,"usada completa",1,1
+500mHzto5Hz_40s_5s_div,XD_ALL0010_F0010,BP,1,"usada completa",1,1
+500mHzto5Hz_40s_5s_div,XD_ALL0010_F0010,COMP,1,"usada completa",1,1
+500mHzto5Hz_40s_5s_div,XD_ALL0010_F0010,LP,1,"usada completa",1,1
+500mHzto5Hz_40s_5s_div,XD_ALL0010_F0010,LP_PGA,1,"usada completa",1,1
+500mHzto5Hz_40s_5s_div,Osciloscopio_ALL0000_F0000,BP,1,"usada completa",1,1
+500mHzto5Hz_40s_5s_div,Osciloscopio_ALL0000_F0000,COMP,0,"omitida: campaña histórica sólo para BP/LP",0,0
+500mHzto5Hz_40s_5s_div,Osciloscopio_ALL0000_F0000,LP,1,"usada completa",1,1
+500mHzto5Hz_40s_5s_div,Osciloscopio_ALL0000_F0000,LP_PGA,0,"omitida: campaña histórica sólo para BP/LP",0,0
+2.5Hzto25Hz_8s_1s_div,XD_ALL0005_F0005,BP,1,"usada completa",1,1
+2.5Hzto25Hz_8s_1s_div,XD_ALL0005_F0005,COMP,1,"usada completa",1,1
+2.5Hzto25Hz_8s_1s_div,XD_ALL0005_F0005,LP,1,"usada completa",1,1
+2.5Hzto25Hz_8s_1s_div,XD_ALL0005_F0005,LP_PGA,1,"usada completa",1,1
+2.5Hzto25Hz_8s_1s_div,XD_ALL0007_F0007,BP,1,"usada completa",1,1
+2.5Hzto25Hz_8s_1s_div,XD_ALL0007_F0007,COMP,1,"usada completa",1,1
+2.5Hzto25Hz_8s_1s_div,XD_ALL0007_F0007,LP,1,"usada completa",1,1
+2.5Hzto25Hz_8s_1s_div,XD_ALL0007_F0007,LP_PGA,1,"usada completa",1,1
+2.5Hzto25Hz_8s_1s_div,Osciloscopio_ALL0000_F0000,BP,1,"usada completa",1,1
+2.5Hzto25Hz_8s_1s_div,Osciloscopio_ALL0000_F0000,COMP,0,"omitida: campaña histórica sólo para BP/LP",0,0
+2.5Hzto25Hz_8s_1s_div,Osciloscopio_ALL0000_F0000,LP,1,"usada completa",1,1
+2.5Hzto25Hz_8s_1s_div,Osciloscopio_ALL0000_F0000,LP_PGA,0,"omitida: campaña histórica sólo para BP/LP",0,0
+2.5Hzto25Hz_8s_1s_div,Osciloscopio_calibracion_2026-07-21_ALL0000_F0000,BP,1,"usada completa",1,1
+2.5Hzto25Hz_8s_1s_div,Osciloscopio_calibracion_2026-07-21_ALL0000_F0000,COMP,0,"omitida: campaña histórica sólo para BP/LP",0,0
+2.5Hzto25Hz_8s_1s_div,Osciloscopio_calibracion_2026-07-21_ALL0000_F0000,LP,0,"descartada: saturación de CH4 sin tramo lineal suficiente",0,0.0228136882129278
+2.5Hzto25Hz_8s_1s_div,Osciloscopio_calibracion_2026-07-21_ALL0000_F0000,LP_PGA,0,"omitida: campaña histórica sólo para BP/LP",0,0
+2.5Hzto25Hz_8s_1s_div,Osciloscopio_calibracion_2026-07-21_ALL0001_F0001,BP,1,"usada completa",1,1
+2.5Hzto25Hz_8s_1s_div,Osciloscopio_calibracion_2026-07-21_ALL0001_F0001,COMP,0,"omitida: campaña histórica sólo para BP/LP",0,0
+2.5Hzto25Hz_8s_1s_div,Osciloscopio_calibracion_2026-07-21_ALL0001_F0001,LP,0,"descartada: saturación de CH4 sin tramo lineal suficiente",0,0.00760456273764259
+2.5Hzto25Hz_8s_1s_div,Osciloscopio_calibracion_2026-07-21_ALL0001_F0001,LP_PGA,0,"omitida: campaña histórica sólo para BP/LP",0,0
+10Hzto100Hz_2s_250ms_div,ALL0002_F0002,BP,1,"usada completa",1,1
+10Hzto100Hz_2s_250ms_div,ALL0002_F0002,COMP,1,"usada completa",1,1
+10Hzto100Hz_2s_250ms_div,ALL0002_F0002,LP,1,"usada completa",1,1
+10Hzto100Hz_2s_250ms_div,ALL0002_F0002,LP_PGA,1,"usada completa",1,1
+10Hzto100Hz_2s_250ms_div,ALL0003_F0003,BP,1,"usada completa",1,1
+10Hzto100Hz_2s_250ms_div,ALL0003_F0003,COMP,1,"usada completa",1,1
+10Hzto100Hz_2s_250ms_div,ALL0003_F0003,LP,1,"usada completa",1,1
+10Hzto100Hz_2s_250ms_div,ALL0003_F0003,LP_PGA,1,"usada completa",1,1
+10Hzto100Hz_2s_250ms_div,ALL0004_F0004,BP,1,"usada completa",1,1
+10Hzto100Hz_2s_250ms_div,ALL0004_F0004,COMP,1,"usada completa",1,1
+10Hzto100Hz_2s_250ms_div,ALL0004_F0004,LP,1,"usada completa",1,1
+10Hzto100Hz_2s_250ms_div,ALL0004_F0004,LP_PGA,1,"usada completa",1,1
+10Hzto100Hz_2s_250ms_div,ALL0005_F0005,BP,1,"usada completa",1,1
+10Hzto100Hz_2s_250ms_div,ALL0005_F0005,COMP,1,"usada parcialmente: 1 submuestra(s), 71.2% del sweep lineal; saturación CH1",1,0.71156979902227
+10Hzto100Hz_2s_250ms_div,ALL0005_F0005,LP,1,"usada completa",1,1
+10Hzto100Hz_2s_250ms_div,ALL0005_F0005,LP_PGA,1,"usada parcialmente: 1 submuestra(s), 71.2% del sweep lineal; saturación CH1",1,0.71156979902227
+10Hzto100Hz_2s_250ms_div,XD_ALL0003_F0003,BP,1,"usada completa",1,1
+10Hzto100Hz_2s_250ms_div,XD_ALL0003_F0003,COMP,1,"usada completa",1,1
+10Hzto100Hz_2s_250ms_div,XD_ALL0003_F0003,LP,1,"usada completa",1,1
+10Hzto100Hz_2s_250ms_div,XD_ALL0003_F0003,LP_PGA,1,"usada completa",1,1
+10Hzto100Hz_2s_250ms_div,XD_ALL0004_F0004,BP,1,"usada completa",1,1
+10Hzto100Hz_2s_250ms_div,XD_ALL0004_F0004,COMP,1,"usada completa",1,1
+10Hzto100Hz_2s_250ms_div,XD_ALL0004_F0004,LP,1,"usada completa",1,1
+10Hzto100Hz_2s_250ms_div,XD_ALL0004_F0004,LP_PGA,1,"usada completa",1,1
+10Hzto100Hz_2s_250ms_div,Osciloscopio_ALL0000_F0000,BP,1,"usada completa",1,1
+10Hzto100Hz_2s_250ms_div,Osciloscopio_ALL0000_F0000,COMP,0,"omitida: campaña histórica sólo para BP/LP",0,0
+10Hzto100Hz_2s_250ms_div,Osciloscopio_ALL0000_F0000,LP,1,"usada completa",1,1
+10Hzto100Hz_2s_250ms_div,Osciloscopio_ALL0000_F0000,LP_PGA,0,"omitida: campaña histórica sólo para BP/LP",0,0
+10Hzto100Hz_2s_250ms_div,Osciloscopio_calibracion_2026-07-21_ALL0001_F0001,BP,1,"usada completa",1,1
+10Hzto100Hz_2s_250ms_div,Osciloscopio_calibracion_2026-07-21_ALL0001_F0001,COMP,0,"omitida: campaña histórica sólo para BP/LP",0,0
+10Hzto100Hz_2s_250ms_div,Osciloscopio_calibracion_2026-07-21_ALL0001_F0001,LP,1,"usada parcialmente: 1 submuestra(s), 5.2% del sweep lineal; saturación CH4",1,0.0516023900054318
+10Hzto100Hz_2s_250ms_div,Osciloscopio_calibracion_2026-07-21_ALL0001_F0001,LP_PGA,0,"omitida: campaña histórica sólo para BP/LP",0,0
+10Hzto100Hz_2s_250ms_div,Osciloscopio_calibracion_2026-07-21_ALL0002_F0002,BP,1,"usada completa",1,1
+10Hzto100Hz_2s_250ms_div,Osciloscopio_calibracion_2026-07-21_ALL0002_F0002,COMP,0,"omitida: campaña histórica sólo para BP/LP",0,0
+10Hzto100Hz_2s_250ms_div,Osciloscopio_calibracion_2026-07-21_ALL0002_F0002,LP,0,"descartada: saturación de CH4 sin tramo lineal suficiente",0,0.0048886474741988
+10Hzto100Hz_2s_250ms_div,Osciloscopio_calibracion_2026-07-21_ALL0002_F0002,LP_PGA,0,"omitida: campaña histórica sólo para BP/LP",0,0
+10Hzto100Hz_2s_250ms_div,Osciloscopio_calibracion_2026-07-21_ALL0003_F0003,BP,1,"usada completa",1,1
+10Hzto100Hz_2s_250ms_div,Osciloscopio_calibracion_2026-07-21_ALL0003_F0003,COMP,0,"omitida: campaña histórica sólo para BP/LP",0,0
+10Hzto100Hz_2s_250ms_div,Osciloscopio_calibracion_2026-07-21_ALL0003_F0003,LP,0,"descartada: saturación de CH4 sin tramo lineal suficiente",0,0.00760456273764259
+10Hzto100Hz_2s_250ms_div,Osciloscopio_calibracion_2026-07-21_ALL0003_F0003,LP_PGA,0,"omitida: campaña histórica sólo para BP/LP",0,0
+50Hzto500Hz_400ms_50ms_div,XD_ALL0000_F0000,BP,1,"usada completa",1,1
+50Hzto500Hz_400ms_50ms_div,XD_ALL0000_F0000,COMP,1,"usada completa",1,1
+50Hzto500Hz_400ms_50ms_div,XD_ALL0000_F0000,LP,1,"usada completa",1,1
+50Hzto500Hz_400ms_50ms_div,XD_ALL0000_F0000,LP_PGA,1,"usada completa",1,1
+50Hzto500Hz_400ms_50ms_div,XD_ALL0001_F0001,BP,1,"usada completa",1,1
+50Hzto500Hz_400ms_50ms_div,XD_ALL0001_F0001,COMP,1,"usada completa",1,1
+50Hzto500Hz_400ms_50ms_div,XD_ALL0001_F0001,LP,1,"usada completa",1,1
+50Hzto500Hz_400ms_50ms_div,XD_ALL0001_F0001,LP_PGA,1,"usada completa",1,1
+50Hzto500Hz_400ms_50ms_div,XD_ALL0002_F0002,BP,1,"usada completa",1,1
+50Hzto500Hz_400ms_50ms_div,XD_ALL0002_F0002,COMP,1,"usada completa",1,1
+50Hzto500Hz_400ms_50ms_div,XD_ALL0002_F0002,LP,1,"usada completa",1,1
+50Hzto500Hz_400ms_50ms_div,XD_ALL0002_F0002,LP_PGA,1,"usada completa",1,1
+50Hzto500Hz_400ms_50ms_div,Osciloscopio_ALL0000_F0000,BP,1,"usada completa",1,1
+50Hzto500Hz_400ms_50ms_div,Osciloscopio_ALL0000_F0000,COMP,0,"omitida: campaña histórica sólo para BP/LP",0,0
+50Hzto500Hz_400ms_50ms_div,Osciloscopio_ALL0000_F0000,LP,1,"usada completa",1,1
+50Hzto500Hz_400ms_50ms_div,Osciloscopio_ALL0000_F0000,LP_PGA,0,"omitida: campaña histórica sólo para BP/LP",0,0
+50Hzto500Hz_400ms_50ms_div,Osciloscopio_calibracion_2026-07-21_ALL0001_F0001,BP,0,"descartada: saturación de CH2 sin tramo lineal suficiente",0,0.0108636610537751
+50Hzto500Hz_400ms_50ms_div,Osciloscopio_calibracion_2026-07-21_ALL0001_F0001,COMP,0,"omitida: campaña histórica sólo para BP/LP",0,0
+50Hzto500Hz_400ms_50ms_div,Osciloscopio_calibracion_2026-07-21_ALL0001_F0001,LP,1,"usada parcialmente: 1 submuestra(s), 17.2% del sweep lineal; saturación CH4",1,0.171645844649647
+50Hzto500Hz_400ms_50ms_div,Osciloscopio_calibracion_2026-07-21_ALL0001_F0001,LP_PGA,0,"omitida: campaña histórica sólo para BP/LP",0,0
+50Hzto500Hz_400ms_50ms_div,Osciloscopio_calibracion_2026-07-21_ALL0002_F0002,BP,1,"usada completa",1,1
+50Hzto500Hz_400ms_50ms_div,Osciloscopio_calibracion_2026-07-21_ALL0002_F0002,COMP,0,"omitida: campaña histórica sólo para BP/LP",0,0
+50Hzto500Hz_400ms_50ms_div,Osciloscopio_calibracion_2026-07-21_ALL0002_F0002,LP,1,"usada parcialmente: 1 submuestra(s), 34.6% del sweep lineal; saturación CH4",1,0.346007604562738
+50Hzto500Hz_400ms_50ms_div,Osciloscopio_calibracion_2026-07-21_ALL0002_F0002,LP_PGA,0,"omitida: campaña histórica sólo para BP/LP",0,0
+50Hzto500Hz_400ms_50ms_div,Osciloscopio_calibracion_2026-07-21_ALL0003_F0003,BP,1,"usada completa",1,1
+50Hzto500Hz_400ms_50ms_div,Osciloscopio_calibracion_2026-07-21_ALL0003_F0003,COMP,0,"omitida: campaña histórica sólo para BP/LP",0,0
+50Hzto500Hz_400ms_50ms_div,Osciloscopio_calibracion_2026-07-21_ALL0003_F0003,LP,1,"usada parcialmente: 1 submuestra(s), 64.1% del sweep lineal; saturación CH4",1,0.640956002172732
+50Hzto500Hz_400ms_50ms_div,Osciloscopio_calibracion_2026-07-21_ALL0003_F0003,LP_PGA,0,"omitida: campaña histórica sólo para BP/LP",0,0
+50Hzto500Hz_400ms_50ms_div,Osciloscopio_calibracion_2026-07-21_ALL0004_F0004,BP,1,"usada completa",1,1
+50Hzto500Hz_400ms_50ms_div,Osciloscopio_calibracion_2026-07-21_ALL0004_F0004,COMP,0,"omitida: campaña histórica sólo para BP/LP",0,0
+50Hzto500Hz_400ms_50ms_div,Osciloscopio_calibracion_2026-07-21_ALL0004_F0004,LP,1,"usada parcialmente: 1 submuestra(s), 64.7% del sweep lineal; saturación CH4",1,0.647474198804997
+50Hzto500Hz_400ms_50ms_div,Osciloscopio_calibracion_2026-07-21_ALL0004_F0004,LP_PGA,0,"omitida: campaña histórica sólo para BP/LP",0,0
+100Hzto1kHz_200ms_25ms_div,ALL0006_F0006,BP,1,"usada completa",1,1
+100Hzto1kHz_200ms_25ms_div,ALL0006_F0006,COMP,1,"usada completa",1,1
+100Hzto1kHz_200ms_25ms_div,ALL0006_F0006,LP,1,"usada completa",1,1
+100Hzto1kHz_200ms_25ms_div,ALL0006_F0006,LP_PGA,1,"usada completa",1,1
+100Hzto1kHz_200ms_25ms_div,ALL0007_F0007,BP,1,"usada completa",1,1
+100Hzto1kHz_200ms_25ms_div,ALL0007_F0007,COMP,1,"usada completa",1,1
+100Hzto1kHz_200ms_25ms_div,ALL0007_F0007,LP,1,"usada completa",1,1
+100Hzto1kHz_200ms_25ms_div,ALL0007_F0007,LP_PGA,1,"usada completa",1,1
+250Hzto2.5kHz_80ms_10ms_div,ALL0005_F0005,BP,1,"usada parcialmente: 1 submuestra(s), 97.5% del sweep lineal; saturación CH2",1,0.975013579576317
+250Hzto2.5kHz_80ms_10ms_div,ALL0005_F0005,COMP,1,"usada parcialmente: 1 submuestra(s), 97.5% del sweep lineal; saturación CH2",1,0.975013579576317
+250Hzto2.5kHz_80ms_10ms_div,ALL0005_F0005,LP,1,"usada completa",1,1
+250Hzto2.5kHz_80ms_10ms_div,ALL0005_F0005,LP_PGA,1,"usada parcialmente: 1 submuestra(s), 97.5% del sweep lineal; saturación CH2",1,0.975013579576317
+250Hzto2.5kHz_80ms_10ms_div,ALL0006_F0006,BP,1,"usada parcialmente: 1 submuestra(s), 97.5% del sweep lineal; saturación CH2",1,0.975013579576317
+250Hzto2.5kHz_80ms_10ms_div,ALL0006_F0006,COMP,1,"usada parcialmente: 1 submuestra(s), 97.5% del sweep lineal; saturación CH2",1,0.975013579576317
+250Hzto2.5kHz_80ms_10ms_div,ALL0006_F0006,LP,1,"usada completa",1,1
+250Hzto2.5kHz_80ms_10ms_div,ALL0006_F0006,LP_PGA,1,"usada parcialmente: 1 submuestra(s), 97.5% del sweep lineal; saturación CH2",1,0.975013579576317
+250Hzto2.5kHz_80ms_10ms_div,Osciloscopio_ALL0000_F0000,BP,1,"usada completa",1,1
+250Hzto2.5kHz_80ms_10ms_div,Osciloscopio_ALL0000_F0000,COMP,0,"omitida: campaña histórica sólo para BP/LP",0,0
+250Hzto2.5kHz_80ms_10ms_div,Osciloscopio_ALL0000_F0000,LP,1,"usada completa",1,1
+250Hzto2.5kHz_80ms_10ms_div,Osciloscopio_ALL0000_F0000,LP_PGA,0,"omitida: campaña histórica sólo para BP/LP",0,0
+250Hzto2.5kHz_80ms_10ms_div,Osciloscopio_calibracion_2026-07-21_ALL0001_F0001,BP,1,"usada completa",1,1
+250Hzto2.5kHz_80ms_10ms_div,Osciloscopio_calibracion_2026-07-21_ALL0001_F0001,COMP,0,"omitida: campaña histórica sólo para BP/LP",0,0
+250Hzto2.5kHz_80ms_10ms_div,Osciloscopio_calibracion_2026-07-21_ALL0001_F0001,LP,1,"usada completa",1,1
+250Hzto2.5kHz_80ms_10ms_div,Osciloscopio_calibracion_2026-07-21_ALL0001_F0001,LP_PGA,0,"omitida: campaña histórica sólo para BP/LP",0,0
+250Hzto2.5kHz_80ms_10ms_div,Osciloscopio_calibracion_2026-07-21_ALL0002_F0002,BP,1,"usada completa",1,1
+250Hzto2.5kHz_80ms_10ms_div,Osciloscopio_calibracion_2026-07-21_ALL0002_F0002,COMP,0,"omitida: campaña histórica sólo para BP/LP",0,0
+250Hzto2.5kHz_80ms_10ms_div,Osciloscopio_calibracion_2026-07-21_ALL0002_F0002,LP,1,"usada completa",1,1
+250Hzto2.5kHz_80ms_10ms_div,Osciloscopio_calibracion_2026-07-21_ALL0002_F0002,LP_PGA,0,"omitida: campaña histórica sólo para BP/LP",0,0
+250Hzto2.5kHz_80ms_10ms_div,Osciloscopio_calibracion_2026-07-21_ALL0003_F0003,BP,1,"usada completa",1,1
+250Hzto2.5kHz_80ms_10ms_div,Osciloscopio_calibracion_2026-07-21_ALL0003_F0003,COMP,0,"omitida: campaña histórica sólo para BP/LP",0,0
+250Hzto2.5kHz_80ms_10ms_div,Osciloscopio_calibracion_2026-07-21_ALL0003_F0003,LP,1,"usada completa",1,1
+250Hzto2.5kHz_80ms_10ms_div,Osciloscopio_calibracion_2026-07-21_ALL0003_F0003,LP_PGA,0,"omitida: campaña histórica sólo para BP/LP",0,0
+250Hzto2.5kHz_80ms_10ms_div,Osciloscopio_calibracion_2026-07-21_ALL0004_F0004,BP,1,"usada completa",1,1
+250Hzto2.5kHz_80ms_10ms_div,Osciloscopio_calibracion_2026-07-21_ALL0004_F0004,COMP,0,"omitida: campaña histórica sólo para BP/LP",0,0
+250Hzto2.5kHz_80ms_10ms_div,Osciloscopio_calibracion_2026-07-21_ALL0004_F0004,LP,1,"usada completa",1,1
+250Hzto2.5kHz_80ms_10ms_div,Osciloscopio_calibracion_2026-07-21_ALL0004_F0004,LP_PGA,0,"omitida: campaña histórica sólo para BP/LP",0,0
+1kHzto10kHz_20ms_2.5ms_div,ALL0003_F0003,BP,1,"usada parcialmente: 2 submuestra(s), 83.4% del sweep lineal; saturación CH2",2,0.833785985877241
+1kHzto10kHz_20ms_2.5ms_div,ALL0003_F0003,COMP,1,"usada parcialmente: 2 submuestra(s), 83.4% del sweep lineal; saturación CH2",2,0.833785985877241
+1kHzto10kHz_20ms_2.5ms_div,ALL0003_F0003,LP,1,"usada completa",1,1
+1kHzto10kHz_20ms_2.5ms_div,ALL0003_F0003,LP_PGA,1,"usada parcialmente: 2 submuestra(s), 83.4% del sweep lineal; saturación CH2",2,0.833785985877241
+1kHzto10kHz_20ms_2.5ms_div,ALL0004_F0004,BP,1,"usada completa",1,1
+1kHzto10kHz_20ms_2.5ms_div,ALL0004_F0004,COMP,1,"usada completa",1,1
+1kHzto10kHz_20ms_2.5ms_div,ALL0004_F0004,LP,1,"usada completa",1,1
+1kHzto10kHz_20ms_2.5ms_div,ALL0004_F0004,LP_PGA,1,"usada completa",1,1
+1kHzto10kHz_20ms_2.5ms_div,Osciloscopio_ALL0000_F0000,BP,1,"usada completa",1,1
+1kHzto10kHz_20ms_2.5ms_div,Osciloscopio_ALL0000_F0000,COMP,0,"omitida: campaña histórica sólo para BP/LP",0,0
+1kHzto10kHz_20ms_2.5ms_div,Osciloscopio_ALL0000_F0000,LP,1,"usada completa",1,1
+1kHzto10kHz_20ms_2.5ms_div,Osciloscopio_ALL0000_F0000,LP_PGA,0,"omitida: campaña histórica sólo para BP/LP",0,0
+1kHzto10kHz_20ms_2.5ms_div,Osciloscopio_calibracion_2026-07-21_ALL0001_F0001,BP,1,"usada parcialmente: 2 submuestra(s), 82.1% del sweep lineal; saturación CH2",2,0.820749592612711
+1kHzto10kHz_20ms_2.5ms_div,Osciloscopio_calibracion_2026-07-21_ALL0001_F0001,COMP,0,"omitida: campaña histórica sólo para BP/LP",0,0
+1kHzto10kHz_20ms_2.5ms_div,Osciloscopio_calibracion_2026-07-21_ALL0001_F0001,LP,1,"usada completa",1,1
+1kHzto10kHz_20ms_2.5ms_div,Osciloscopio_calibracion_2026-07-21_ALL0001_F0001,LP_PGA,0,"omitida: campaña histórica sólo para BP/LP",0,0
+1kHzto10kHz_20ms_2.5ms_div,Osciloscopio_calibracion_2026-07-21_ALL0002_F0002,BP,1,"usada completa",1,1
+1kHzto10kHz_20ms_2.5ms_div,Osciloscopio_calibracion_2026-07-21_ALL0002_F0002,COMP,0,"omitida: campaña histórica sólo para BP/LP",0,0
+1kHzto10kHz_20ms_2.5ms_div,Osciloscopio_calibracion_2026-07-21_ALL0002_F0002,LP,1,"usada completa",1,1
+1kHzto10kHz_20ms_2.5ms_div,Osciloscopio_calibracion_2026-07-21_ALL0002_F0002,LP_PGA,0,"omitida: campaña histórica sólo para BP/LP",0,0
+1kHzto10kHz_20ms_2.5ms_div,Osciloscopio_calibracion_2026-07-21_ALL0003_F0003,BP,1,"usada completa",1,1
+1kHzto10kHz_20ms_2.5ms_div,Osciloscopio_calibracion_2026-07-21_ALL0003_F0003,COMP,0,"omitida: campaña histórica sólo para BP/LP",0,0
+1kHzto10kHz_20ms_2.5ms_div,Osciloscopio_calibracion_2026-07-21_ALL0003_F0003,LP,1,"usada completa",1,1
+1kHzto10kHz_20ms_2.5ms_div,Osciloscopio_calibracion_2026-07-21_ALL0003_F0003,LP_PGA,0,"omitida: campaña histórica sólo para BP/LP",0,0
+1kHzto10kHz_20ms_2.5ms_div,Osciloscopio_calibracion_2026-07-21_ALL0004_F0004,BP,1,"usada completa",1,1
+1kHzto10kHz_20ms_2.5ms_div,Osciloscopio_calibracion_2026-07-21_ALL0004_F0004,COMP,0,"omitida: campaña histórica sólo para BP/LP",0,0
+1kHzto10kHz_20ms_2.5ms_div,Osciloscopio_calibracion_2026-07-21_ALL0004_F0004,LP,1,"usada completa",1,1
+1kHzto10kHz_20ms_2.5ms_div,Osciloscopio_calibracion_2026-07-21_ALL0004_F0004,LP_PGA,0,"omitida: campaña histórica sólo para BP/LP",0,0
+5kHzto50kHz_4ms_500us_div,ALL0001_F0001,BP,1,"usada parcialmente: 1 submuestra(s), 90.8% del sweep lineal; saturación CH2",1,0.907658881042911
+5kHzto50kHz_4ms_500us_div,ALL0001_F0001,COMP,1,"usada parcialmente: 1 submuestra(s), 90.8% del sweep lineal; saturación CH2",1,0.907658881042911
+5kHzto50kHz_4ms_500us_div,ALL0001_F0001,LP,1,"usada completa",1,1
+5kHzto50kHz_4ms_500us_div,ALL0001_F0001,LP_PGA,1,"usada parcialmente: 1 submuestra(s), 90.8% del sweep lineal; saturación CH2",1,0.907658881042911
+5kHzto50kHz_4ms_500us_div,ALL0002_F0002,BP,1,"usada completa",1,1
+5kHzto50kHz_4ms_500us_div,ALL0002_F0002,COMP,1,"usada completa",1,1
+5kHzto50kHz_4ms_500us_div,ALL0002_F0002,LP,1,"usada completa",1,1
+5kHzto50kHz_4ms_500us_div,ALL0002_F0002,LP_PGA,1,"usada completa",1,1
+5kHzto50kHz_4ms_500us_div,Osciloscopio_ALL0000_F0000,BP,1,"usada completa",1,1
+5kHzto50kHz_4ms_500us_div,Osciloscopio_ALL0000_F0000,COMP,0,"omitida: campaña histórica sólo para BP/LP",0,0
+5kHzto50kHz_4ms_500us_div,Osciloscopio_ALL0000_F0000,LP,1,"usada completa",1,1
+5kHzto50kHz_4ms_500us_div,Osciloscopio_ALL0000_F0000,LP_PGA,0,"omitida: campaña histórica sólo para BP/LP",0,0
+5kHzto50kHz_4ms_500us_div,Osciloscopio_calibracion_2026-07-21_ALL0001_F0001,BP,1,"usada completa",1,1
+5kHzto50kHz_4ms_500us_div,Osciloscopio_calibracion_2026-07-21_ALL0001_F0001,COMP,0,"omitida: campaña histórica sólo para BP/LP",0,0
+5kHzto50kHz_4ms_500us_div,Osciloscopio_calibracion_2026-07-21_ALL0001_F0001,LP,1,"usada completa",1,1
+5kHzto50kHz_4ms_500us_div,Osciloscopio_calibracion_2026-07-21_ALL0001_F0001,LP_PGA,0,"omitida: campaña histórica sólo para BP/LP",0,0
+5kHzto50kHz_4ms_500us_div,Osciloscopio_calibracion_2026-07-21_ALL0002_F0002,BP,1,"usada completa",1,1
+5kHzto50kHz_4ms_500us_div,Osciloscopio_calibracion_2026-07-21_ALL0002_F0002,COMP,0,"omitida: campaña histórica sólo para BP/LP",0,0
+5kHzto50kHz_4ms_500us_div,Osciloscopio_calibracion_2026-07-21_ALL0002_F0002,LP,1,"usada completa",1,1
+5kHzto50kHz_4ms_500us_div,Osciloscopio_calibracion_2026-07-21_ALL0002_F0002,LP_PGA,0,"omitida: campaña histórica sólo para BP/LP",0,0
+5kHzto50kHz_4ms_500us_div,Osciloscopio_calibracion_2026-07-21_ALL0003_F0003,BP,1,"usada completa",1,1
+5kHzto50kHz_4ms_500us_div,Osciloscopio_calibracion_2026-07-21_ALL0003_F0003,COMP,0,"omitida: campaña histórica sólo para BP/LP",0,0
+5kHzto50kHz_4ms_500us_div,Osciloscopio_calibracion_2026-07-21_ALL0003_F0003,LP,1,"usada completa",1,1
+5kHzto50kHz_4ms_500us_div,Osciloscopio_calibracion_2026-07-21_ALL0003_F0003,LP_PGA,0,"omitida: campaña histórica sólo para BP/LP",0,0
+5kHzto50kHz_4ms_500us_div,Osciloscopio_calibracion_2026-07-21_ALL0004_F0004,BP,1,"usada completa",1,1
+5kHzto50kHz_4ms_500us_div,Osciloscopio_calibracion_2026-07-21_ALL0004_F0004,COMP,0,"omitida: campaña histórica sólo para BP/LP",0,0
+5kHzto50kHz_4ms_500us_div,Osciloscopio_calibracion_2026-07-21_ALL0004_F0004,LP,1,"usada completa",1,1
+5kHzto50kHz_4ms_500us_div,Osciloscopio_calibracion_2026-07-21_ALL0004_F0004,LP_PGA,0,"omitida: campaña histórica sólo para BP/LP",0,0
+20kHzto200kHz_1ms_100us_div,ALL0000_F0000,BP,1,"usada completa",1,1
+20kHzto200kHz_1ms_100us_div,ALL0000_F0000,COMP,1,"usada completa",1,1
+20kHzto200kHz_1ms_100us_div,ALL0000_F0000,LP,1,"usada completa",1,1
+20kHzto200kHz_1ms_100us_div,ALL0000_F0000,LP_PGA,1,"usada completa",1,1
+20kHzto200kHz_1ms_100us_div,Osciloscopio_root_F0000,BP,1,"usada completa",1,1
+20kHzto200kHz_1ms_100us_div,Osciloscopio_root_F0000,COMP,0,"omitida: campaña histórica sólo para BP/LP",0,0
+20kHzto200kHz_1ms_100us_div,Osciloscopio_root_F0000,LP,1,"usada completa",1,1
+20kHzto200kHz_1ms_100us_div,Osciloscopio_root_F0000,LP_PGA,0,"omitida: campaña histórica sólo para BP/LP",0,0
+20kHzto200kHz_1ms_100us_div,Osciloscopio_calibracion_2026-07-21_ALL0000_F0000,BP,1,"usada completa",1,1
+20kHzto200kHz_1ms_100us_div,Osciloscopio_calibracion_2026-07-21_ALL0000_F0000,COMP,0,"omitida: campaña histórica sólo para BP/LP",0,0
+20kHzto200kHz_1ms_100us_div,Osciloscopio_calibracion_2026-07-21_ALL0000_F0000,LP,1,"usada completa",1,1
+20kHzto200kHz_1ms_100us_div,Osciloscopio_calibracion_2026-07-21_ALL0000_F0000,LP_PGA,0,"omitida: campaña histórica sólo para BP/LP",0,0
+20kHzto200kHz_1ms_100us_div,Osciloscopio_calibracion_2026-07-21_ALL0001_F0001,BP,1,"usada completa",1,1
+20kHzto200kHz_1ms_100us_div,Osciloscopio_calibracion_2026-07-21_ALL0001_F0001,COMP,0,"omitida: campaña histórica sólo para BP/LP",0,0
+20kHzto200kHz_1ms_100us_div,Osciloscopio_calibracion_2026-07-21_ALL0001_F0001,LP,1,"usada completa",1,1
+20kHzto200kHz_1ms_100us_div,Osciloscopio_calibracion_2026-07-21_ALL0001_F0001,LP_PGA,0,"omitida: campaña histórica sólo para BP/LP",0,0
+20kHzto200kHz_1ms_100us_div,Osciloscopio_calibracion_2026-07-21_ALL0002_F0002,BP,1,"usada completa",1,1
+20kHzto200kHz_1ms_100us_div,Osciloscopio_calibracion_2026-07-21_ALL0002_F0002,COMP,0,"omitida: campaña histórica sólo para BP/LP",0,0
+20kHzto200kHz_1ms_100us_div,Osciloscopio_calibracion_2026-07-21_ALL0002_F0002,LP,1,"usada completa",1,1
+20kHzto200kHz_1ms_100us_div,Osciloscopio_calibracion_2026-07-21_ALL0002_F0002,LP_PGA,0,"omitida: campaña histórica sólo para BP/LP",0,0
+20kHzto200kHz_1ms_100us_div,Osciloscopio_calibracion_2026-07-21_ALL0003_F0003,BP,1,"usada completa",1,1
+20kHzto200kHz_1ms_100us_div,Osciloscopio_calibracion_2026-07-21_ALL0003_F0003,COMP,0,"omitida: campaña histórica sólo para BP/LP",0,0
+20kHzto200kHz_1ms_100us_div,Osciloscopio_calibracion_2026-07-21_ALL0003_F0003,LP,1,"usada completa",1,1
+20kHzto200kHz_1ms_100us_div,Osciloscopio_calibracion_2026-07-21_ALL0003_F0003,LP_PGA,0,"omitida: campaña histórica sólo para BP/LP",0,0
+20kHzto200kHz_1ms_100us_div,Osciloscopio_calibracion_2026-07-21_ALL0004_F0004,BP,1,"usada completa",1,1
+20kHzto200kHz_1ms_100us_div,Osciloscopio_calibracion_2026-07-21_ALL0004_F0004,COMP,0,"omitida: campaña histórica sólo para BP/LP",0,0
+20kHzto200kHz_1ms_100us_div,Osciloscopio_calibracion_2026-07-21_ALL0004_F0004,LP,1,"usada completa",1,1
+20kHzto200kHz_1ms_100us_div,Osciloscopio_calibracion_2026-07-21_ALL0004_F0004,LP_PGA,0,"omitida: campaña histórica sólo para BP/LP",0,0
