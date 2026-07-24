@@ -5,7 +5,7 @@ Modelos del geófono SM-24, cadena analógica, controladores, interfaces y prueb
 ## Inicio rápido
 
 ```matlab
-cd('C:/ruta/Tesis-modelado-matlab')
+cd('C:/ruta/Tesis-calculos-matlab')
 init_project
 ```
 
@@ -13,7 +13,7 @@ init_project
 
 Los cachés de Simulink (`slprj/`, `*.slxc` y `*_cache.mat`) son regenerables y no se versionan. En el superproyecto `Tesis` este repositorio se monta en `modelado/matlab`.
 
-Los archivos MATLAB `.mat` versionados se guardan mediante Git LFS en `Github-LFS/repositories/Tesis-modelado-matlab`. Después de clonar con `GIT_LFS_SKIP_SMUDGE=1`, configure e hidrate estos objetos con:
+Los archivos MATLAB `.mat` versionados se guardan mediante Git LFS en `Github-LFS/repositories/Tesis-calculos-matlab`. Después de clonar con `GIT_LFS_SKIP_SMUDGE=1`, configure e hidrate estos objetos con:
 
 ```powershell
 $env:GITHUB_LFS_ROOT = 'C:\Users\elias\OneDrive\Github-LFS'
