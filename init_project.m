@@ -1,5 +1,5 @@
 function project_root = init_project()
-%INIT_PROJECT Configura el path del repositorio de modelado de Tesis.
+%INIT_PROJECT Configura el path del repositorio de calculos y modelado de Tesis.
 %
 % Agrega al path:
 %   - la raiz de este repositorio
