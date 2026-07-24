@@ -1,4 +1,0 @@
-ComponentClass,MinusPercent,PlusPercent,Distribution,Samples,Seed
-Resistencia,1,1,uniforme independiente,4000,2909
-Cerámico <=100 nF,20,20,uniforme independiente,4000,2909
-Electrolítico >100 nF,40,10,uniforme independiente,4000,2909

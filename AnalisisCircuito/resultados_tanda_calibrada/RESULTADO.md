@@ -48,8 +48,14 @@ La diferencia entre ambas es sólo 0.42 dB. Los dos barridos 10–100 Hz nuevos 
 - El modelo PSoC High completo predice `CH3/CH1 = -57.582 dB` en 10.2046 Hz. La tanda nueva mide aproximadamente -31.26 dB: la muesca es reproducible, pero queda 26.33 dB menos profunda que el objetivo.
 - El LP sí funciona aproximadamente como se espera. En 10.2046 Hz las dos capturas dan 13.192 y 13.202 dB, frente a 13.978 dB del modelo. En toda la banda de ajuste 10.6–984 Hz, la medición queda a 0.435 dB RMS del modelo PSoC High.
 - BP es muy coherente localmente, pero las dos repeticiones nuevas difieren 0.75 dB en ganancia absoluta en 10.2046 Hz (0.732 y -0.022 dB, frente a 0.772 dB nominal). Una diferencia pequeña en BP es importante porque el compensador depende de una cancelación casi exacta.
-- Al fusionar todas las campañas históricas de BP, `tfest` ajusta la nube con 6.62 dB RMS. Esto no significa baja coherencia dentro de cada barrido: significa que las campañas no coinciden bien entre sí en ganancia de BP, especialmente a alta frecuencia. LP, en cambio, permanece consistente al fusionar campañas (`tfest`: 0.205 dB RMS).
-- Para la tanda principal, `tfest` describe bien la curva realmente medida del compensador (1.55 dB RMS). El desacuerdo de 11.58 dB RMS es contra el modelo objetivo, no un fracaso de `tfest`.
+- Al fusionar todas las campañas históricas de BP, `tfest` ajusta la nube con 6.485 dB RMS. Esto no significa baja coherencia dentro de cada barrido: significa que las campañas no coinciden bien entre sí en ganancia de BP, especialmente a alta frecuencia. LP, en cambio, permanece consistente al fusionar campañas (`tfest`: 0.596 dB RMS).
+- Para la tanda principal, el modelo ampliado de `tfest` describe muy bien las curvas realmente medidas: compensador 0.379 dB/2.444 grados RMS y PGA→ADC 0.200 dB/1.161 grados RMS. El desacuerdo de aproximadamente 11.5 dB y 44 grados contra PSoC High es una discrepancia circuito-modelo, no un residuo de identificación.
+
+## Orden ampliado y gráficos normalizados
+
+Se agregaron dos polos por cada operacional comprendido en la transferencia y el mismo incremento al grado permitido del numerador para conservar el grado relativo: BP 4/3, compensador 5/4, LP 4/2 y PGA→ADC 11/8. Los modelos guardados son estables y tienen respectivamente 4, 5, 4 y 11 polos. GEO→ADC se obtiene componiendo el último con `Hgeo(s)=zeta*w0*s/(s^2+2*zeta*w0*s+w0^2)`, por lo que tiene 13 polos; el factor `2*zeta*w0` del denominador está aplicado tanto a la referencia como al Monte Carlo.
+
+La carpeta `06_graficos_normalizados` contiene cinco pares `.fig/.png`. Cruda, procesada, `tfest` y PSoC High llevan independientemente su máximo a 0 dB; la fase y la coherencia se conservan. Las figuras originales siguen siendo la referencia para ganancia absoluta y envolventes de tolerancia.
 
 ## Potenciómetro
 

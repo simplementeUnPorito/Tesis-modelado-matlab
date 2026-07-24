@@ -1,0 +1,93 @@
+Análisis de sweeps de la cadena analógica
+Datos: C:\Github\Tesis\data\raw\Osciloscopio_verificacion_calibracion_2026-07-21
+Escala aplicada a las señales: x1 (sin conversión diferencial)
+Campañas históricas adicionales sólo para BP/LP:
+  - C:\Github\Tesis\data\raw\Osciloscopio
+  - C:\Github\Tesis\data\raw\Osciloscopio_calibracion_2026-07-21
+Bandas faltantes: ninguna
+Geófono nominal: Hgeo=zeta*w0*s/(s^2+2*zeta*w0*s+w0^2), zeta=0.25, w0=2*pi*10 rad/s
+Cadena completa PGA->ADC: medida directamente como CH4/CH1 y comparada con el modelo PSoC High completo y componentes actuales.
+Cadena completa GEO->ADC: Hgeo nominal multiplicada por CH4/CH1 y comparada con Hgeo por el modelo PSoC High completo.
+Compensador verificado directamente como CH3/CH1. Objetivo: (-27k/6.8k)*[(s^2+2*zeta0*w0*s+w0^2)/(s^2+2*zeta1*w0*s+w0^2)]*[1/(1+s*27k*15n)].
+Parámetros: zeta0=0.25, zeta1=937.39633, w0=64.117378 rad/s (10.204598 Hz), ganancia DC=-3.9705882 V/V, polo antialias=392.97517 Hz.
+Rama directa Ru=6800 ohm. Rama BP: fija=6800 ohm + potenciómetro de 2000 ohm. Para zeta0=0.25 se requieren Rbp=7434.5388 ohm, es decir, pot=634.53879 ohm. El nulo está en pot=632.55602 ohm.
+La estimación del pot a partir de BP y CH3 no es confiable: residuo complejo relativo=20.749 con 42 puntos. No se interpreta el mínimo numérico como posición física; medir el pot o calibrar en el nulo.
+tfest se identifica exclusivamente desde la FRF procesada. El informe separa el residuo medición-tfest de la comparación tfest-modelo PSoC High.
+Orden tfest: se agregan dos polos y dos grados de numerador por cada operacional del camino, preservando el grado relativo nominal.
+  BP: nominal 2/1, 1 operacional(es), tfest 4/3 (polos/ceros).
+  COMP: nominal 3/2, 1 operacional(es), tfest 5/4 (polos/ceros).
+  LP: nominal 2/0, 1 operacional(es), tfest 4/2 (polos/ceros).
+  LP_PGA: nominal 5/2, 3 operacional(es), tfest 11/8 (polos/ceros).
+  GEO_LP no se identifica de nuevo: compone Hgeo 2/1 con LP_PGA 11/8 y por ello resulta 13/9.
+La carpeta 06_graficos_normalizados lleva de forma independiente el máximo de cada curva a 0 dB; no altera fase ni coherencia. Las envolventes absolutas de tolerancias permanecen en las gráficas originales.
+Saturación: al alcanzar |V| >= 2.3 V se excluye un margen de 1 ciclo alrededor de cada recorte y se identifican por separado los tramos lineales continuos. BP local usa la máscara de CH2 y LP la de CH4; una entrada local recortada sigue siendo una excitación medida. COMP usa las máscaras CH1/CH2/CH3 y la cadena PGA-ADC usa CH1..CH4. El CSV de uso informa cantidad de submuestras y fracción del sweep conservada.
+Operacional PSoC High: A0=31622.777 V/V (90 dB), GBW=8000000 Hz, polo dominante=252.98221 Hz, Rin=35000000 ohm, Rout=20 ohm, Cin=1.8e-11 F.
+SR del modelo 4300000 V/s: se evalúa como límite de gran señal, no como parte de la TF lineal. Margen conservador mínimo observado: 1.6051 (modelo), 1.1198 (SR mínimo datasheet).
+Ruido de entrada (45 nV/sqrt(Hz)) y offset máximo (3 mV) quedan documentados; no se agrega ruido sintético y el offset DC se elimina al centrar.
+Monte Carlo: 4000 muestras, semilla 2909. R -1/+1 %; cerámicos -20/+20 %; electrolíticos -40/+10 %.
+En Monte Carlo el potenciómetro se recalibra en cada realización dentro de 0..2k; realizaciones dentro de rango: 100 %.
+La envolvente adicional barre 41 posiciones, incluidos 0 y 2k, para combinar el recorrido completo del potenciómetro con las tolerancias.
+Nota: todos los CSV informan Probe Atten=1X; verificar que coincida con la sonda física.
+
+===== BP =====
+Numerador: [0 4062.875319 -836727732.6 -4.875701997e+10 -2.068722778e+12]
+Denominador: [1 8724.563925 827267878.5 5.387971443e+10 2.377741831e+12]
+Polos rad/s:
+  -4329.70984 +28424.5405j
+  -4329.70984 -28424.5405j
+  -32.5721243 +42.6056128j
+  -32.5721243 -42.6056128j
+
+===== COMP =====
+Numerador: [0 -9814.164304 -195155945.6 -1.188922861e+12 -7.472622163e+14 -3.966346735e+15]
+Denominador: [1 27864.2401 1062243197 1.558872813e+13 2.699797681e+16 9.745368195e+14]
+Polos rad/s:
+  -4972.47634 +28768.6797j
+  -4972.47634 -28768.6797j
+  -15931.0861 +0j
+  -1988.16522 +0j
+  -0.0360974135 +0j
+
+===== LP =====
+Numerador: [0 0 -19893568.41 111270522.5 -4.187742639e+13]
+Denominador: [1 2951.456203 6156403.306 6216832165 8.530850905e+12]
+Polos rad/s:
+  -1475.72809 +1368.30877j
+  -1475.72809 -1368.30877j
+  -1.38011263e-05 +1451.33075j
+  -1.38011263e-05 -1451.33075j
+
+===== LP_PGA =====
+Numerador: [0 0 0 5.595521538e+10 3.420527472e+14 3.836878861e+17 9.033098929e+20 5.957043684e+23 3.303624364e+24 2.1384983e+24 8.431407583e+24 -5.18866801e+23]
+Denominador: [1 13513.34939 343178285.5 1.343758243e+12 3.189769101e+15 5.122608358e+18 5.987308998e+21 4.316499374e+24 1.085908459e+24 1.195293578e+25 1.979867545e+23 1.098802084e+24]
+Polos rad/s:
+  -4661.43444 +16496.2512j
+  -4661.43444 -16496.2512j
+  -1669.41331 +0j
+  -1245.89609 +1337.99371j
+  -1245.89609 -1337.99371j
+  -14.5136024 +1622.14526j
+  -14.5136024 -1622.14526j
+  -0.119655936 +1.63045869j
+  -0.119655936 -1.63045869j
+  -0.00425209802 +0.308639757j
+  -0.00425209802 -0.308639757j
+
+===== GEO_LP =====
+Numerador: [0 0 0 0 8.789424678e+11 5.372951988e+15 6.026955222e+18 1.418915862e+22 9.357302337e+24 5.189321016e+25 3.359145275e+25 1.324402406e+26 -8.150340651e+24 0]
+Denominador: [1 13544.76531 343606767.8 1.354592855e+12 3.233339325e+15 5.228122854e+18 6.160833189e+21 4.524819481e+24 1.603296842e+26 1.708692424e+28 4.662705302e+27 4.719561778e+28 8.161402631e+26 4.337896755e+27]
+Polos rad/s:
+  -4661.43444 +16496.2512j
+  -4661.43444 -16496.2512j
+  -14.5136024 +1622.14526j
+  -14.5136024 -1622.14526j
+  -1245.89609 +1337.99371j
+  -1245.89609 -1337.99371j
+  -1669.41331 +0j
+  -15.7079633 +60.8366801j
+  -15.7079633 -60.8366801j
+  -0.119655936 +1.63045869j
+  -0.119655936 -1.63045869j
+  -0.00425209802 +0.308639757j
+  -0.00425209802 -0.308639757j
+
